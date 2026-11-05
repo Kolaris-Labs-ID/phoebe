@@ -1,0 +1,8 @@
+.remember/
+.DS_Store
+*.xcodeproj/xcuserdata/
+DerivedData/
+build/
+/backend/bin/
+/backend/.data/
+.env
