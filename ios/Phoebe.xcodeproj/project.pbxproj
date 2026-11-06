@@ -10,6 +10,7 @@
 		0055C51B0B1C1BDBF4ED50DF /* Audio.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 8CAB3B1E75F090184622BF85 /* Audio.xcstrings */; };
 		0383DEC1E39E7C77180CCD78 /* ExportArtifactTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A8B5C951AC22A1105157836D /* ExportArtifactTests.swift */; };
 		04BC9E06EA4DD08E15A8D104 /* Poller.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9AF866CD0A042A71CC7ADC13 /* Poller.swift */; };
+		07C74B5711BBE96F18290CDF /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 07B06D905BC7A70EA0FB5E47 /* PrivacyInfo.xcprivacy */; };
 		0CA8E497934D4977CBB72E2D /* Export.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = FB38E40CC524C85E539DD18B /* Export.xcstrings */; };
 		126FE89E86BED7631E7D38F3 /* ImportConfirmSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E8282CE4182202BB3EC0381 /* ImportConfirmSheet.swift */; };
 		15070EDF3E1550A1415FB10E /* ChecksumTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF4C77B872B4C3905E45A74F /* ChecksumTests.swift */; };
@@ -172,6 +173,7 @@
 		07104FE810A98043745E63BE /* LibraryModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryModel.swift; sourceTree = "<group>"; };
 		0791A31BAABA462B4F2C7981 /* ImportModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportModel.swift; sourceTree = "<group>"; };
 		079CE7173E9FA54DC8B87186 /* Toast.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Toast.swift; sourceTree = "<group>"; };
+		07B06D905BC7A70EA0FB5E47 /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		086F896EC1641A384C2FF88A /* MeetingDetailModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeetingDetailModel.swift; sourceTree = "<group>"; };
 		08F0598781A2250C6D472E4D /* Patch.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Patch.swift; sourceTree = "<group>"; };
 		0B11D79DD197D6771C9A62EC /* FormattingTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FormattingTests.swift; sourceTree = "<group>"; };
@@ -557,6 +559,7 @@
 				B9066F57CDC261E54C293650 /* Library.xcstrings */,
 				4C9E3E62EBA93DC50C8BABC9 /* MeetingDetail.xcstrings */,
 				78419D4E93896B97302A284D /* Onboarding.xcstrings */,
+				07B06D905BC7A70EA0FB5E47 /* PrivacyInfo.xcprivacy */,
 				7683AE5ED3166AFF4EF68D81 /* Recording.xcstrings */,
 				3C23ED9CD4624038D8636849 /* Settings.xcstrings */,
 				6C1DBFCF466F8E4D857B8F94 /* Sync.xcstrings */,
@@ -656,6 +659,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = 320954B27BA45E590EEA3BA5 /* Build configuration list for PBXNativeTarget "Phoebe" */;
 			buildPhases = (
+				2DA85CC4E03859265D2B82F9 /* Require https API URL for Release */,
 				A1DD944A65375CD37807DA41 /* Sources */,
 				81EFAA8A92A84F161181D78A /* Resources */,
 			);
@@ -724,6 +728,7 @@
 				BDF6749DE224389574BC2703 /* Library.xcstrings in Resources */,
 				3351223A5CFBBA291C8A1D88 /* MeetingDetail.xcstrings in Resources */,
 				E0E4D75199FBB115022BF043 /* Onboarding.xcstrings in Resources */,
+				07C74B5711BBE96F18290CDF /* PrivacyInfo.xcprivacy in Resources */,
 				B792D8BFBC854908B35F37DF /* Recording.xcstrings in Resources */,
 				A36C4BFCB4171CB901763B5B /* Settings.xcstrings in Resources */,
 				FD30736D650A991FB99AAEB3 /* Sync.xcstrings in Resources */,
@@ -731,6 +736,28 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		2DA85CC4E03859265D2B82F9 /* Require https API URL for Release */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Require https API URL for Release";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "if [ \"$CONFIGURATION\" = Release ] && [[ \"$PHOEBE_API_BASE_URL\" != https://* ]]; then\n  echo \"error: Release needs PHOEBE_API_BASE_URL = https:/\\$()/<host> in Config/Local.xcconfig (the app exits at launch without it)\"\n  exit 1\nfi\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		4471B3E73C2FA9BB29650631 /* Sources */ = {
@@ -985,12 +1012,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Phoebe/Phoebe.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Phoebe/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PHOEBE_API_BASE_URL = "";
+				MARKETING_VERSION = 0.1.0;
 				PHOEBE_DEV_LOGIN = 0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kolarislabs.phoebe;
 				SDKROOT = iphoneos;
@@ -1117,11 +1145,13 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = Phoebe/Phoebe.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CURRENT_PROJECT_VERSION = 1;
 				INFOPLIST_FILE = Phoebe/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
+				MARKETING_VERSION = 0.1.0;
 				PHOEBE_API_BASE_URL = "http://localhost:8080";
 				PHOEBE_DEV_LOGIN = 1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.kolarislabs.phoebe;

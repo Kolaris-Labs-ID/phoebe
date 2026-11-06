@@ -123,7 +123,7 @@ Known issues (real, not fixed):
 10. **Usage minutes don't add up.** Each figure is floored separately (`floor(seconds/60)`, per `design-system/phoebe/pages/settings.md`), e.g. "0 dari 120 menit terpakai · 119 menit tersisa" after 20 s.
 11. **Sign-out keeps the retired SwiftData container alive for 1 s** to avoid a SwiftUI `@Query` crash. Account deletion waits up to 3 s before removing the store. These are timing margins, not guarantees.
 12. **Minor UI observations.** Tag-picker search hides the sheet toolbar (standard `.searchable`); one stray `onChange … multiple times per frame` fault appears when opening a detail; the simulator document picker sometimes crashes (the E2E test retries).
-13. **Local leftovers.** Scratch databases `phoebe_smoke_c3`, `phoebe_c2_schemacheck`, `phoebe_fixrun_schema` and `phoebe_fixrun_migrated` still exist (a safety hook blocks `DROP DATABASE` for agents; drop them by hand). The dev database `phoebe` (migration 0004) holds E2E and smoke test accounts.
+13. **Local leftovers.** The dev database `phoebe` (migration 0004) holds E2E and smoke test accounts.
 14. **Port 8080.** Compose binds the API to host 8080, which is taken on some machines, and the iOS Debug build hard-codes `localhost:8080`.
 15. **Sign-out while offline doesn't end the server session.** The app clears its local tokens, but the logout call fails, so the refresh token stays valid on the server until `SESSION_MAX_AGE` (180 days) unless the account is deleted.
 

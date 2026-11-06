@@ -2,5 +2,6 @@
 // Without it DEVELOPMENT_TEAM stays empty: simulator builds still work, device builds need a team.
 DEVELOPMENT_TEAM =
 CODE_SIGN_STYLE = Automatic
+PHOEBE_API_BASE_URL =
 
 #include? "Local.xcconfig"

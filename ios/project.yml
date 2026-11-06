@@ -26,6 +26,9 @@ targets:
       path: Phoebe/Info.plist
       properties:
         CFBundleDisplayName: Phoebe
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        ITSAppUsesNonExemptEncryption: false
         CFBundleDevelopmentRegion: en
         CFBundleLocalizations: [en, id]
         NSMicrophoneUsageDescription: "Phoebe uses the microphone only while you record a meeting."
@@ -38,12 +41,22 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.kolarislabs.phoebe
+        MARKETING_VERSION: 0.1.0
+        CURRENT_PROJECT_VERSION: 1
         TARGETED_DEVICE_FAMILY: "1"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
       configs:
         Debug:   { PHOEBE_API_BASE_URL: "http://localhost:8080", PHOEBE_DEV_LOGIN: "1" }
-        Release: { PHOEBE_API_BASE_URL: "", PHOEBE_DEV_LOGIN: "0" }
+        Release: { PHOEBE_DEV_LOGIN: "0" }
+    preBuildScripts:
+      - name: Require https API URL for Release
+        basedOnDependencyAnalysis: false
+        script: |
+          if [ "$CONFIGURATION" = Release ] && [[ "$PHOEBE_API_BASE_URL" != https://* ]]; then
+            echo "error: Release needs PHOEBE_API_BASE_URL = https:/\$()/<host> in Config/Local.xcconfig (the app exits at launch without it)"
+            exit 1
+          fi
   PhoebeTests:
     type: bundle.unit-test
     platform: iOS
