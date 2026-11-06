@@ -53,6 +53,9 @@ func renderDOCX(d *doc) ([]byte, error) {
 			w.items(s.style, s.items)
 		}
 	}
+	if d.approximate {
+		w.para("", 0, false, d.l.approxLegend)
+	}
 
 	document := xmlDecl + `<w:document ` + nsW + `><w:body>` + w.b.String() +
 		`<w:sectPr><w:pgSz w:w="11906" w:h="16838"/><w:pgMar w:top="` + itoa(pageMargin) + `" w:right="` + itoa(pageMargin) +
@@ -120,18 +123,36 @@ func (w *docxWriter) para(style string, num int, bold bool, text string) {
 	w.b.WriteString(`</w:p>`)
 }
 
+// Noto Sans comes from the style defaults; only runs that need DejaVu Sans name it, mirroring the PDF fallback.
 func (w *docxWriter) run(bold bool, text string) {
-	w.b.WriteString(`<w:r>`)
+	style := ""
 	if bold {
-		w.b.WriteString(`<w:rPr><w:b/></w:rPr>`)
+		style = "B"
 	}
-	for i, line := range strings.Split(text, "\n") {
-		if i > 0 {
-			w.b.WriteString(`<w:br/>`)
+	runs := fontRuns(text, style)
+	if len(runs) == 0 {
+		runs = []fontRun{{family: pdfFont}}
+	}
+	for _, fr := range runs {
+		w.b.WriteString(`<w:r>`)
+		if bold || fr.family == pdfFallback {
+			w.b.WriteString(`<w:rPr>`)
+			if fr.family == pdfFallback {
+				w.b.WriteString(`<w:rFonts w:ascii="` + docxFallback + `" w:hAnsi="` + docxFallback + `" w:eastAsia="` + docxFallback + `" w:cs="` + docxFallback + `"/>`)
+			}
+			if bold {
+				w.b.WriteString(`<w:b/>`)
+			}
+			w.b.WriteString(`</w:rPr>`)
 		}
-		w.b.WriteString(`<w:t xml:space="preserve">` + esc(line) + `</w:t>`)
+		for i, line := range strings.Split(fr.text, "\n") {
+			if i > 0 {
+				w.b.WriteString(`<w:br/>`)
+			}
+			w.b.WriteString(`<w:t xml:space="preserve">` + esc(line) + `</w:t>`)
+		}
+		w.b.WriteString(`</w:r>`)
 	}
-	w.b.WriteString(`</w:r>`)
 }
 
 func (w *docxWriter) table(d *doc, actions []action) {
@@ -220,7 +241,7 @@ func headingStyle(id, name string, size, outline int) string {
 }
 
 var stylesXML = xmlDecl + `<w:styles ` + nsW + `>` +
-	`<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="Calibri" w:hAnsi="Calibri" w:eastAsia="Calibri" w:cs="Calibri"/>` +
+	`<w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="` + docxFont + `" w:hAnsi="` + docxFont + `" w:eastAsia="` + docxFont + `" w:cs="` + docxFont + `"/>` +
 	`<w:sz w:val="22"/><w:szCs w:val="22"/></w:rPr></w:rPrDefault>` +
 	`<w:pPrDefault><w:pPr><w:spacing w:after="120" w:line="276" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>` +
 	`<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>` +

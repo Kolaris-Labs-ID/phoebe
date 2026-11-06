@@ -35,6 +35,8 @@ enum PipelineStep {
         case (_, .waitingConnection): "wifi.slash"
         case (_, .waitingQuota): "gauge.with.dots.needle.100percent"
         case (_, .planExpired): "calendar.badge.exclamationmark"
+        case (_, .waitingAISlot): "hourglass"
+        case (_, .notGenerated): "note.text"
         case (.upload, .pending): "icloud.and.arrow.up"
         case (.upload, .active): "arrow.up.circle"
         case (.upload, .verifying), (.upload, .done): "checkmark.icloud"
@@ -55,6 +57,8 @@ enum PipelineStep {
         case .waitingConnection: "step.waitingConnection"
         case .waitingQuota: "step.waitingQuota"
         case .planExpired: "step.planExpired"
+        case .waitingAISlot: "step.waitingAISlot"
+        case .notGenerated: "step.notGenerated"
         case .active: "step.processing"
         case .verifying: "step.verifying"
         case .done: step == .upload ? "step.done" : "step.ready"
@@ -102,8 +106,8 @@ private struct StepView: View {
         case .done: Palette.success
         case .failed: Palette.danger
         case .active, .verifying: Palette.info
-        case .waitingConnection, .waitingQuota, .planExpired: Palette.warning
-        case .pending: Palette.textSecondary
+        case .waitingConnection, .waitingQuota, .planExpired, .waitingAISlot: Palette.warning
+        case .pending, .notGenerated: Palette.textSecondary
         }
     }
 }

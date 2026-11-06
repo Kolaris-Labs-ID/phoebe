@@ -59,33 +59,66 @@ struct Endpoint<Response: Decodable & Sendable>: Sendable {
 
 struct APIClient: Sendable {
     static let logger = Logger(subsystem: "com.kolarislabs.phoebe", category: "api")
+    static let refreshLeeway: TimeInterval = 60
+    // A background chunk task can sit in the system queue for minutes before it is sent.
+    static let uploadTokenMinValidity: TimeInterval = 300
+    // Well under REFRESH_REUSE_GRACE, so a lost refresh reply is detected while a retry is still accepted.
+    static let refreshTimeout: TimeInterval = 8
+
+    static let backgroundActivity: @Sendable () async -> @Sendable () -> Void = {
+        let activity = await BackgroundActivity(name: "phoebe.token-refresh")
+        return { Task { @MainActor in activity.end() } }
+    }
 
     let baseURL: URL
     let session: URLSession
-    let tokenProvider: @Sendable () -> String?
     let onUnauthenticated: @Sendable () -> Void
+    private let refresher: TokenRefresher
 
     init(
         baseURL: URL,
         session: URLSession = .shared,
-        tokenProvider: @escaping @Sendable () -> String?,
+        tokens: any TokenStore,
+        now: @escaping @Sendable () -> Date = { Date() },
+        keepAlive: @escaping @Sendable () async -> @Sendable () -> Void = APIClient.backgroundActivity,
         onUnauthenticated: @escaping @Sendable () -> Void = {}
     ) {
         self.baseURL = baseURL
         self.session = session
-        self.tokenProvider = tokenProvider
         self.onUnauthenticated = onUnauthenticated
+        self.refresher = TokenRefresher(
+            store: tokens,
+            now: now,
+            exchange: { refreshToken in
+                let endpoint = Endpoints.refresh(refreshToken: refreshToken)
+                var request = Self.buildRequest(baseURL: baseURL, endpoint, token: nil, requestID: UUID())
+                request.timeoutInterval = Self.refreshTimeout
+                let (data, response) = try await Self.perform(request, session: session)
+                guard let http = response as? HTTPURLResponse else { throw APIError.transport(nil) }
+                guard (200..<300).contains(http.statusCode) else {
+                    throw APIError.from(status: http.statusCode, data: data)
+                }
+                return try Self.decode(TokenPairDTO.self, from: data)
+                    .anchored(serverDate: TokenPairDTO.httpDate(http.value(forHTTPHeaderField: "Date")), receivedAt: now())
+            },
+            keepAlive: keepAlive,
+            onSessionEnded: onUnauthenticated
+        )
     }
 
     func send<R>(_ endpoint: Endpoint<R>) async throws -> R {
-        let request = makeRequest(endpoint)
-        let data: Data, response: URLResponse
-        do {
-            (data, response) = try await session.data(for: request)
-        } catch {
-            throw APIError.from(error)
+        let token = endpoint.requiresAuth ? try await refresher.accessToken(minValidity: Self.refreshLeeway) : nil
+        var (data, response) = try await Self.perform(makeRequest(endpoint, token: token), session: session)
+        if let token, Self.isAccessTokenExpired(data: data, response: response) {
+            let fresh = try await refresher.refresh(rejecting: token)
+            (data, response) = try await Self.perform(makeRequest(endpoint, token: fresh), session: session)
         }
-        return try handle(endpoint, data: data, response: response)
+        do {
+            return try handle(endpoint, data: data, response: response)
+        } catch APIError.accessTokenExpired {
+            // Rejected again right after a refresh: stop this call (callers park on .unauthenticated) without signing out.
+            throw APIError.unauthenticated
+        }
     }
 
     // 404 on a delete means it is already gone (api §4.2, ios §9).
@@ -97,7 +130,15 @@ struct APIClient: Sendable {
         }
     }
 
-    func makeRequest<R>(_ endpoint: Endpoint<R>, requestID: UUID = UUID()) -> URLRequest {
+    func authorizedRequest<R>(_ endpoint: Endpoint<R>, minValidity: TimeInterval = uploadTokenMinValidity) async throws -> URLRequest {
+        makeRequest(endpoint, token: try await refresher.accessToken(minValidity: minValidity))
+    }
+
+    func makeRequest<R>(_ endpoint: Endpoint<R>, token: String?, requestID: UUID = UUID()) -> URLRequest {
+        Self.buildRequest(baseURL: baseURL, endpoint, token: endpoint.requiresAuth ? token : nil, requestID: requestID)
+    }
+
+    private static func buildRequest<R>(baseURL: URL, _ endpoint: Endpoint<R>, token: String?, requestID: UUID) -> URLRequest {
         var components = URLComponents(url: baseURL.appending(path: endpoint.path), resolvingAgainstBaseURL: false)!
         if !endpoint.query.isEmpty { components.queryItems = endpoint.query }
         var request = URLRequest(url: components.url!)
@@ -108,11 +149,22 @@ struct APIClient: Sendable {
             request.httpBody = body
             request.setValue("application/json; charset=utf-8", forHTTPHeaderField: "Content-Type")
         }
-        if endpoint.requiresAuth, let token = tokenProvider() {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
-        }
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         for (name, value) in endpoint.headers { request.setValue(value, forHTTPHeaderField: name) }
         return request
+    }
+
+    private static func perform(_ request: URLRequest, session: URLSession) async throws -> (Data, URLResponse) {
+        do {
+            return try await session.data(for: request)
+        } catch {
+            throw APIError.from(error)
+        }
+    }
+
+    private static func isAccessTokenExpired(data: Data, response: URLResponse) -> Bool {
+        guard let http = response as? HTTPURLResponse, http.statusCode == 401 else { return false }
+        return APIError.from(status: 401, data: data) == .accessTokenExpired
     }
 
     func handle<R>(_ endpoint: Endpoint<R>, data: Data, response: URLResponse) throws -> R {
@@ -120,7 +172,7 @@ struct APIClient: Sendable {
         let requestID = http.value(forHTTPHeaderField: "X-Request-ID") ?? "-"
         Self.logger.debug("\(endpoint.method.rawValue, privacy: .public) \(endpoint.path, privacy: .private) → \(http.statusCode, privacy: .public) rid=\(requestID, privacy: .public)")
         guard (200..<300).contains(http.statusCode) else {
-            let error = APIError.from(status: http.statusCode, data: data, retryAfter: http.value(forHTTPHeaderField: "Retry-After"))
+            let error = APIError.from(status: http.statusCode, data: data)
             if error == .unauthenticated, endpoint.requiresAuth { onUnauthenticated() }
             throw error
         }

@@ -33,8 +33,10 @@ type Config struct {
 	ApplePrivateKey string `secret:"true"`
 	TokenEncKey     []byte `secret:"true"`
 
-	DevLoginEnabled bool
-	SessionTTL      time.Duration
+	DevLoginEnabled   bool
+	AccessTokenTTL    time.Duration
+	SessionMaxAge     time.Duration
+	RefreshReuseGrace time.Duration
 
 	MaxAudioSeconds     int64
 	MaxUploadBytes      int64
@@ -44,7 +46,8 @@ type Config struct {
 	AudioRetentionDays  int
 	TrialQuotaMinutes   int64
 	TrialPeriodDays     int
-	AIUserJobsPerDay    int
+	AIGenerationLimit   int
+	AIGenerationWindow  time.Duration
 	PurgeDelay          time.Duration
 
 	STTProvider       string
@@ -57,6 +60,17 @@ type Config struct {
 	STTPricePerMin    float64
 	FFmpegPath        string
 
+	STTChunkTargetSeconds        int
+	STTChunkMinSeconds           int
+	STTChunkMaxSeconds           int
+	STTSilenceNoiseDB            float64
+	STTSilenceMinDuration        time.Duration
+	STTDropSilenceRatio          float64
+	STTUncertainMeanLogprob      float64
+	STTUncertainAvgLogprob       float64
+	STTUncertainNoSpeechProb     float64
+	STTUncertainCompressionRatio float64
+
 	LLMProvider           string
 	LLMBaseURL            string
 	LLMAPIKey             string `secret:"true"`
@@ -66,6 +80,8 @@ type Config struct {
 	LLMMaxTranscriptChars int
 	LLMPriceInPerMTok     float64
 	LLMPriceOutPerMTok    float64
+	LLMThinkingNotes      bool
+	LLMThinkingMoM        bool
 
 	WorkerID                string
 	WorkerConcurrency       int
@@ -103,8 +119,10 @@ func LoadFrom(getenv func(string) string) (*Config, error) {
 		AppleKeyID:      p.str("APPLE_KEY_ID", ""),
 		ApplePrivateKey: p.str("APPLE_PRIVATE_KEY", ""),
 
-		DevLoginEnabled: p.boolean("DEV_LOGIN_ENABLED", false),
-		SessionTTL:      p.dur("SESSION_TTL", "4320h"),
+		DevLoginEnabled:   p.boolean("DEV_LOGIN_ENABLED", false),
+		AccessTokenTTL:    p.dur("ACCESS_TOKEN_TTL", "15m"),
+		SessionMaxAge:     p.dur("SESSION_MAX_AGE", "4320h"),
+		RefreshReuseGrace: p.dur("REFRESH_REUSE_GRACE", "30s"),
 
 		MaxAudioSeconds:     p.int64("MAX_AUDIO_SECONDS", 7200),
 		MaxUploadBytes:      p.int64("MAX_UPLOAD_BYTES", 262144000),
@@ -114,28 +132,42 @@ func LoadFrom(getenv func(string) string) (*Config, error) {
 		AudioRetentionDays:  int(p.int64("AUDIO_RETENTION_DAYS", 30)),
 		TrialQuotaMinutes:   p.int64("TRIAL_QUOTA_MINUTES", 120),
 		TrialPeriodDays:     int(p.int64("TRIAL_PERIOD_DAYS", 30)),
-		AIUserJobsPerDay:    int(p.int64("AI_USER_JOBS_PER_DAY", 30)),
+		AIGenerationLimit:   int(p.int64("AI_GENERATION_LIMIT", 30)),
+		AIGenerationWindow:  p.dur("AI_GENERATION_WINDOW", "24h"),
 		PurgeDelay:          p.dur("PURGE_DELAY", "90m"),
 
 		STTProvider:       p.str("STT_PROVIDER", "fake"),
 		STTBaseURL:        strings.TrimRight(p.str("STT_BASE_URL", "https://api.openai.com/v1"), "/"),
 		STTAPIKey:         p.str("STT_API_KEY", ""),
-		STTModel:          p.str("STT_MODEL", ""),
+		STTModel:          p.str("STT_MODEL", "gpt-4o-mini-transcribe"),
 		STTRequestTimeout: p.dur("STT_REQUEST_TIMEOUT", "5m"),
 		STTMaxFileBytes:   p.int64("STT_MAX_FILE_BYTES", 24000000),
 		STTChunkSeconds:   int(p.int64("STT_CHUNK_SECONDS", 600)),
 		STTPricePerMin:    p.float("STT_PRICE_PER_MIN", 0),
 		FFmpegPath:        p.str("FFMPEG_PATH", "ffmpeg"),
 
+		STTChunkTargetSeconds:        int(p.int64("STT_CHUNK_TARGET_SECONDS", 30)),
+		STTChunkMinSeconds:           int(p.int64("STT_CHUNK_MIN_SECONDS", 10)),
+		STTChunkMaxSeconds:           int(p.int64("STT_CHUNK_MAX_SECONDS", 45)),
+		STTSilenceNoiseDB:            p.float("STT_SILENCE_NOISE_DB", -35),
+		STTSilenceMinDuration:        p.dur("STT_SILENCE_MIN_DURATION", "500ms"),
+		STTDropSilenceRatio:          p.float("STT_DROP_SILENCE_RATIO", 0.8),
+		STTUncertainMeanLogprob:      p.float("STT_UNCERTAIN_MEAN_LOGPROB", -0.7),
+		STTUncertainAvgLogprob:       p.float("STT_UNCERTAIN_AVG_LOGPROB", -1.0),
+		STTUncertainNoSpeechProb:     p.float("STT_UNCERTAIN_NO_SPEECH_PROB", 0.6),
+		STTUncertainCompressionRatio: p.float("STT_UNCERTAIN_COMPRESSION_RATIO", 2.4),
+
 		LLMProvider:           p.str("LLM_PROVIDER", "fake"),
 		LLMBaseURL:            strings.TrimRight(p.str("LLM_BASE_URL", ""), "/"),
 		LLMAPIKey:             p.str("LLM_API_KEY", ""),
-		LLMModel:              p.str("LLM_MODEL", ""),
+		LLMModel:              p.str("LLM_MODEL", "deepseek-flash"),
 		LLMTemperature:        p.float("LLM_TEMPERATURE", 0.2),
 		LLMRequestTimeout:     p.dur("LLM_REQUEST_TIMEOUT", "180s"),
 		LLMMaxTranscriptChars: int(p.int64("LLM_MAX_TRANSCRIPT_CHARS", 120000)),
 		LLMPriceInPerMTok:     p.float("LLM_PRICE_IN_PER_MTOK", 0),
 		LLMPriceOutPerMTok:    p.float("LLM_PRICE_OUT_PER_MTOK", 0),
+		LLMThinkingNotes:      p.boolean("LLM_THINKING_NOTES", false),
+		LLMThinkingMoM:        p.boolean("LLM_THINKING_MOM", false),
 
 		WorkerID:                p.str("WORKER_ID", defaultWorkerID()),
 		WorkerConcurrency:       int(p.int64("WORKER_CONCURRENCY", 10)),
@@ -152,6 +184,9 @@ func LoadFrom(getenv func(string) string) (*Config, error) {
 		LogLevel: p.level("LOG_LEVEL", "info"),
 	}
 	c.TokenEncKey = p.secret("TOKEN_ENC_KEY", c.AppleKeyID != "", 32, true)
+	if c.LLMProvider == "deepseek" && c.LLMBaseURL == "" {
+		c.LLMBaseURL = "https://api.deepseek.com"
+	}
 	c.validate(&p)
 	if len(p.errs) > 0 {
 		return nil, errors.Join(p.errs...)
@@ -186,26 +221,34 @@ func (c *Config) validate(p *parser) {
 		if c.STTAPIKey == "" {
 			p.fail("STT_API_KEY", "required unless STT_PROVIDER=fake")
 		}
-		if c.STTModel == "" {
-			p.fail("STT_MODEL", "required unless STT_PROVIDER=fake")
-		}
 	default:
 		p.fail("STT_PROVIDER", "must be fake|openai")
 	}
 	switch c.LLMProvider {
 	case "fake":
-	case "openaicompat":
-		if c.LLMBaseURL == "" {
-			p.fail("LLM_BASE_URL", "required unless LLM_PROVIDER=fake")
-		}
+	case "deepseek", "openaicompat":
 		if c.LLMAPIKey == "" {
 			p.fail("LLM_API_KEY", "required unless LLM_PROVIDER=fake")
 		}
-		if c.LLMModel == "" {
-			p.fail("LLM_MODEL", "required unless LLM_PROVIDER=fake")
+		if c.LLMBaseURL == "" {
+			p.fail("LLM_BASE_URL", "required when LLM_PROVIDER=openaicompat")
 		}
 	default:
-		p.fail("LLM_PROVIDER", "must be fake|openaicompat")
+		p.fail("LLM_PROVIDER", "must be fake|deepseek|openaicompat")
+	}
+	// max >= 2*min: a cut must leave both the window and the remainder at least min long.
+	if c.STTChunkMinSeconds <= 0 || c.STTChunkMinSeconds > c.STTChunkTargetSeconds || c.STTChunkTargetSeconds > c.STTChunkMaxSeconds ||
+		c.STTChunkMaxSeconds < 2*c.STTChunkMinSeconds {
+		p.fail("STT_CHUNK_MIN_SECONDS/STT_CHUNK_TARGET_SECONDS/STT_CHUNK_MAX_SECONDS", "must satisfy 0 < min <= target <= max and max >= 2*min")
+	}
+	if c.STTSilenceNoiseDB >= 0 {
+		p.fail("STT_SILENCE_NOISE_DB", "must be < 0")
+	}
+	if c.STTDropSilenceRatio <= 0 || c.STTDropSilenceRatio > 1 {
+		p.fail("STT_DROP_SILENCE_RATIO", "must be in (0, 1]")
+	}
+	if c.AIGenerationWindow < time.Hour || c.AIGenerationWindow%time.Hour != 0 {
+		p.fail("AI_GENERATION_WINDOW", "must be a whole number of hours >= 1h")
 	}
 	if c.PurgeDelay <= c.JobTimeoutTranscribeMax || c.PurgeDelay <= c.JobTimeoutGenerateMax {
 		p.fail("PURGE_DELAY", "must exceed JOB_TIMEOUT_TRANSCRIBE_MAX and JOB_TIMEOUT_GENERATE_MAX")
@@ -216,16 +259,18 @@ func (c *Config) validate(p *parser) {
 		"UPLOAD_CHUNK_MAX_BYTES":     float64(c.UploadChunkMaxBytes),
 		"AUDIO_RETENTION_DAYS":       float64(c.AudioRetentionDays),
 		"TRIAL_PERIOD_DAYS":          float64(c.TrialPeriodDays),
-		"AI_USER_JOBS_PER_DAY":       float64(c.AIUserJobsPerDay),
+		"AI_GENERATION_LIMIT":        float64(c.AIGenerationLimit),
 		"STT_MAX_FILE_BYTES":         float64(c.STTMaxFileBytes),
 		"STT_CHUNK_SECONDS":          float64(c.STTChunkSeconds),
 		"LLM_MAX_TRANSCRIPT_CHARS":   float64(c.LLMMaxTranscriptChars),
 		"WORKER_CONCURRENCY":         float64(c.WorkerConcurrency),
 		"SIGNED_URL_TTL":             float64(c.SignedURLTTL),
-		"SESSION_TTL":                float64(c.SessionTTL),
+		"ACCESS_TOKEN_TTL":           float64(c.AccessTokenTTL),
+		"SESSION_MAX_AGE":            float64(c.SessionMaxAge),
 		"UPLOAD_SESSION_TTL":         float64(c.UploadSessionTTL),
 		"UPLOAD_WRITER_LEASE":        float64(c.UploadWriterLease),
 		"STT_REQUEST_TIMEOUT":        float64(c.STTRequestTimeout),
+		"STT_SILENCE_MIN_DURATION":   float64(c.STTSilenceMinDuration),
 		"LLM_REQUEST_TIMEOUT":        float64(c.LLMRequestTimeout),
 		"WORKER_POLL_INTERVAL":       float64(c.WorkerPollInterval),
 		"JOB_LEASE":                  float64(c.JobLease),
@@ -246,6 +291,7 @@ func (c *Config) validate(p *parser) {
 		"LLM_PRICE_OUT_PER_MTOK": c.LLMPriceOutPerMTok,
 		"ALERT_DAILY_COST_USD":   c.AlertDailyCostUSD,
 		"WORKER_SHUTDOWN_GRACE":  float64(c.WorkerShutdownGrace),
+		"REFRESH_REUSE_GRACE":    float64(c.RefreshReuseGrace),
 	}
 	for k, v := range nonNegative {
 		if v < 0 {

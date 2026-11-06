@@ -1,6 +1,227 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "ai.choice.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription hasn't started, so no transcription minutes have been used. Choose how to continue."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripsi belum dimulai, jadi menit transkripsi belum terpakai. Pilih cara melanjutkan."
+          }
+        }
+      }
+    },
+    "ai.choice.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No AI slot available"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slot AI belum tersedia"
+          }
+        }
+      }
+    },
+    "ai.choice.transcribeOnly": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcribe only"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkrip saja"
+          }
+        }
+      }
+    },
+    "ai.choice.transcribeOnly.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription starts now and uses transcription minutes. You can create AI notes later from the transcript."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripsi dimulai sekarang dan memakai menit transkripsi. Catatan AI bisa dibuat nanti dari transkrip."
+          }
+        }
+      }
+    },
+    "ai.choice.transcribeOnly.minutes": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription starts now and uses about %lld transcription minutes. You can create AI notes later from the transcript."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripsi dimulai sekarang dan memakai sekitar %lld menit transkripsi. Catatan AI bisa dibuat nanti dari transkrip."
+          }
+        }
+      }
+    },
+    "ai.choice.wait": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wait for AI slot"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tunggu slot AI"
+          }
+        }
+      }
+    },
+    "ai.choice.wait.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The recording stays saved and isn't transcribed yet. Start again when a slot is available; the transcript and AI notes are then created together."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Rekaman tetap tersimpan dan belum ditranskripsi. Mulai lagi saat slot tersedia; transkrip dan catatan AI lalu dibuat bersama."
+          }
+        }
+      }
+    },
+    "ai.limit.reached": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI generation limit reached."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Batas generasi AI tercapai."
+          }
+        }
+      }
+    },
+    "ai.slot.banner.available": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "An AI slot is available again. Start transcription with AI notes."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slot AI tersedia lagi. Mulai transkripsi dengan catatan AI."
+          }
+        }
+      }
+    },
+    "ai.slot.banner.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription hasn't started and no minutes were used."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripsi belum dimulai dan menit belum terpakai."
+          }
+        }
+      }
+    },
+    "ai.slot.banner.choose": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Choose how to continue"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pilih cara lanjut"
+          }
+        }
+      }
+    },
+    "ai.slot.banner.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Start transcription"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mulai transkripsi"
+          }
+        }
+      }
+    },
+    "ai.slot.banner.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transcription is waiting for an AI slot"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transkripsi menunggu slot AI"
+          }
+        }
+      }
+    },
     "audio.delete": {
       "extractionState": "manual",
       "localizations": {
@@ -1208,23 +1429,6 @@
         }
       }
     },
-    "doc.regen.limited": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Regenerate limit reached. Try again %@."
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Batas pembuatan ulang tercapai. Coba lagi %@."
-          }
-        }
-      }
-    },
     "doc.regen.syncFirst": {
       "extractionState": "manual",
       "localizations": {
@@ -2268,13 +2472,30 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Create notes"
+            "value": "Generate notes"
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Buat notes"
+            "value": "Buat catatan"
+          }
+        }
+      }
+    },
+    "notes.notGenerated": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "AI notes weren't created because you chose transcription only. You can create them from the transcript."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catatan AI belum dibuat karena Anda memilih transkrip saja. Anda bisa membuatnya dari transkrip."
           }
         }
       }
@@ -2343,6 +2564,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Gagal"
+          }
+        }
+      }
+    },
+    "step.notGenerated": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not created"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Belum dibuat"
           }
         }
       }
@@ -2445,6 +2683,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Memverifikasi"
+          }
+        }
+      }
+    },
+    "step.waitingAISlot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waiting for AI slot"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Menunggu slot AI"
           }
         }
       }
@@ -2704,6 +2959,108 @@
         }
       }
     },
+    "transcript.review.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This part may not have been heard clearly. Listen to the audio, correct the text if needed, then save to mark it as reviewed."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagian ini mungkin tidak terdengar jelas. Dengarkan audionya, perbaiki teks bila perlu, lalu simpan untuk menandainya sudah ditinjau."
+          }
+        }
+      }
+    },
+    "transcript.review.confirm": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Text is correct, mark as reviewed"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Teks sudah benar, tandai sudah ditinjau"
+          }
+        }
+      }
+    },
+    "transcript.review.count": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs review: %lld"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perlu ditinjau: %lld"
+          }
+        }
+      }
+    },
+    "transcript.review.filter": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Show only sections that need review"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tampilkan hanya yang perlu ditinjau"
+          }
+        }
+      }
+    },
+    "transcript.review.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next section to review"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagian berikutnya untuk ditinjau"
+          }
+        }
+      }
+    },
+    "transcript.review.previous": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Previous section to review"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bagian sebelumnya untuk ditinjau"
+          }
+        }
+      }
+    },
     "transcript.showCurrent": {
       "extractionState": "manual",
       "localizations": {
@@ -2734,6 +3091,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "Lihat versi asli"
+          }
+        }
+      }
+    },
+    "transcript.timing.chunk": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Times are approximate, per recording section (about 30 seconds)."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik)."
+          }
+        }
+      }
+    },
+    "transcript.uncertain": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Needs review"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Perlu ditinjau"
           }
         }
       }

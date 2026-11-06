@@ -1,4 +1,4 @@
--- Phoebe initial schema. Copied verbatim to backend/internal/db/migrations/0001_init.sql.
+-- Phoebe schema: cumulative state after all backend/internal/db/migrations (0001_init.sql + later files).
 -- Requires PostgreSQL 16 (NULLS NOT DISTINCT, ON DELETE SET NULL (col)).
 -- updated_at columns are set by application code.
 
@@ -29,16 +29,36 @@ CREATE TABLE trial_grants (
     granted_at   timestamptz NOT NULL DEFAULT now()
 );
 
+-- Session = token family (0002_auth_sessions). expires_at = sign-in + SESSION_MAX_AGE, never extended.
 CREATE TABLE sessions (
-    id         uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id    uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
-    token_hash bytea NOT NULL UNIQUE CHECK (octet_length(token_hash) = 32),
-    created_at timestamptz NOT NULL DEFAULT now(),
-    expires_at timestamptz NOT NULL,
-    revoked_at timestamptz,
-    CHECK (expires_at > created_at)
+    id             uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    created_at     timestamptz NOT NULL DEFAULT now(),
+    expires_at     timestamptz NOT NULL,
+    revoked_at     timestamptz,
+    revoked_reason text CHECK (revoked_reason IN ('logout', 'refresh_reuse', 'account_deleted')),
+    CHECK (expires_at > created_at),
+    CHECK ((revoked_at IS NULL) = (revoked_reason IS NULL))
 );
 CREATE INDEX sessions_user_idx ON sessions (user_id);
+
+-- One access + refresh pair per row; only sha256 of each token is stored. Refresh is single-use.
+CREATE TABLE session_tokens (
+    id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    session_id         uuid NOT NULL REFERENCES sessions (id) ON DELETE CASCADE,
+    access_token_hash  bytea NOT NULL UNIQUE CHECK (octet_length(access_token_hash) = 32),
+    access_expires_at  timestamptz NOT NULL,
+    -- first successful authentication with the access token; a used successor disables the reuse grace
+    access_used_at     timestamptz,
+    refresh_token_hash bytea NOT NULL UNIQUE CHECK (octet_length(refresh_token_hash) = 32),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    rotated_at         timestamptz,
+    successor_id       uuid REFERENCES session_tokens (id) ON DELETE SET NULL,
+    -- unused successor dropped when its predecessor was replayed within REFRESH_REUSE_GRACE
+    invalidated_at     timestamptz
+);
+CREATE INDEX session_tokens_session_idx ON session_tokens (session_id);
+CREATE INDEX session_tokens_successor_idx ON session_tokens (successor_id) WHERE successor_id IS NOT NULL;
 
 CREATE TABLE entitlements (
     user_id       uuid PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
@@ -88,7 +108,7 @@ CREATE TABLE meetings (
     participants      text[] NOT NULL DEFAULT '{}' CHECK (cardinality(participants) <= 100),
     metadata_revision int NOT NULL DEFAULT 1 CHECK (metadata_revision >= 1),
     pipeline_state    text NOT NULL DEFAULT 'awaiting_audio' CHECK (pipeline_state IN (
-                          'awaiting_audio', 'uploading', 'uploaded', 'transcribing', 'transcription_failed',
+                          'awaiting_audio', 'uploading', 'uploaded', 'transcribing', 'transcription_failed', 'transcript_ready',
                           'generating_notes', 'notes_failed', 'notes_ready')),
     created_at        timestamptz NOT NULL DEFAULT now(),
     updated_at        timestamptz NOT NULL DEFAULT now(),
@@ -138,6 +158,11 @@ CREATE TABLE upload_sessions (
     -- optional auto-start of transcription when the last byte is verified (api.md §4.4)
     transcribe_idempotency_key uuid,
     transcribe_language        text CHECK (transcribe_language IN ('auto', 'id', 'en')),
+    transcribe_notes           text CHECK (transcribe_notes IN ('auto', 'skip')),  -- 0003
+    -- auto-start outcome stored at finalize; a replayed complete returns it verbatim (0004)
+    transcribe_job_id          uuid,  -- FK to jobs below
+    transcription_blocked      text CHECK (transcription_blocked IN ('ai_generation_limit')),
+    transcription_blocked_next_slot_at timestamptz,
     failure_reason             text CHECK (failure_reason IN (
                                    'checksum_mismatch', 'audio_unsupported', 'audio_corrupt', 'audio_empty', 'audio_too_long')),
     expires_at                 timestamptz NOT NULL,
@@ -151,7 +176,10 @@ CREATE TABLE upload_sessions (
     CHECK ((writer_lease_id IS NULL) = (writer_lease_until IS NULL)),
     CHECK (status IN ('open', 'verifying') OR writer_lease_id IS NULL),
     CHECK (status <> 'verifying' OR received_bytes = size_bytes),
-    CHECK ((transcribe_idempotency_key IS NULL) = (transcribe_language IS NULL))
+    CHECK ((transcribe_idempotency_key IS NULL) = (transcribe_language IS NULL)),
+    CHECK ((transcribe_idempotency_key IS NULL) = (transcribe_notes IS NULL)),
+    CHECK (transcription_blocked IS NOT NULL OR transcription_blocked_next_slot_at IS NULL),
+    CHECK (transcription_blocked IS NULL OR transcribe_job_id IS NULL)
 );
 CREATE UNIQUE INDEX upload_sessions_one_live_key ON upload_sessions (meeting_id) WHERE status IN ('open', 'verifying');
 CREATE INDEX upload_sessions_expiry_idx ON upload_sessions (expires_at) WHERE status = 'open';
@@ -222,13 +250,16 @@ CREATE INDEX jobs_lease_idx ON jobs (lease_until) WHERE status = 'running';
 CREATE UNIQUE INDEX jobs_one_active_per_meeting_key ON jobs (meeting_id, type)
     WHERE status IN ('queued', 'running') AND meeting_id IS NOT NULL;
 CREATE INDEX jobs_meeting_idx ON jobs (meeting_id, created_at DESC) WHERE meeting_id IS NOT NULL;
-CREATE INDEX jobs_user_rate_idx ON jobs (user_id, created_at)
-    WHERE trigger = 'user' AND type IN ('generate_notes', 'generate_mom');
+ALTER TABLE upload_sessions ADD FOREIGN KEY (transcribe_job_id) REFERENCES jobs (id) ON DELETE SET NULL;
 
 -- revision 1 is the only 'original'; UNIQUE (meeting_id, revision_number) therefore
 -- makes a duplicate transcribe run unable to write a second original.
 -- mutation_fingerprint = sha256hex(canonical request body); a replayed mutation_id with a
 -- different body is rejected (422 idempotency_key_reused).
+-- timing (0003): 'segment' = provider segment timestamps; 'chunk' = our ~30 s silence-aligned
+-- windows, start_ms/end_ms approximate. Corrections copy it. Each segment in segments carries
+-- {id, start_ms, end_ms, text, uncertain, uncertain_reason} (uncertain_reason null|'low_confidence';
+-- rows written before 0003 lack the two keys = not uncertain).
 CREATE TABLE transcript_revisions (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     meeting_id           uuid NOT NULL REFERENCES meetings (id) ON DELETE CASCADE,
@@ -240,6 +271,7 @@ CREATE TABLE transcript_revisions (
     provider             text NOT NULL,
     model                text NOT NULL,
     segments             jsonb NOT NULL CHECK (jsonb_typeof(segments) = 'array'),
+    timing               text NOT NULL CHECK (timing IN ('segment', 'chunk')),
     job_id               uuid UNIQUE REFERENCES jobs (id) DEFERRABLE INITIALLY DEFERRED,
     mutation_id          uuid,
     mutation_fingerprint text CHECK (mutation_fingerprint ~ '^[0-9a-f]{64}$'),
@@ -320,6 +352,29 @@ CREATE INDEX quota_reservations_user_period_idx ON quota_reservations (user_id, 
     WHERE status = 'consumed';
 CREATE INDEX quota_reservations_user_reserved_idx ON quota_reservations (user_id)
     WHERE status = 'reserved';
+
+-- AI generation slots (0003, backend.md §9.1): one row per AI generation job (automatic notes,
+-- user notes generate/regenerate, MoM). job_id = the generate_notes/generate_mom job;
+-- transcribe_job_id = the transcribe job that reserved the slot for its automatic notes (job_id is
+-- attached when that notes job is enqueued). Both unique: a job never holds two slots. Counted =
+-- reserved|consumed with reserved_at inside AI_GENERATION_WINDOW. Rows survive meeting purge
+-- (SET NULL) so consumed generations keep counting.
+CREATE TABLE ai_generation_slots (
+    id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id           uuid NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    meeting_id        uuid REFERENCES meetings (id) ON DELETE SET NULL,
+    job_id            uuid UNIQUE REFERENCES jobs (id) ON DELETE SET NULL,
+    transcribe_job_id uuid UNIQUE REFERENCES jobs (id) ON DELETE SET NULL,
+    status            text NOT NULL DEFAULT 'reserved' CHECK (status IN ('reserved', 'consumed', 'released')),
+    reserved_at       timestamptz NOT NULL DEFAULT now(),
+    consumed_at       timestamptz,
+    released_at       timestamptz,
+    CHECK ((status = 'consumed') = (consumed_at IS NOT NULL)),
+    CHECK ((status = 'released') = (released_at IS NOT NULL))
+);
+CREATE INDEX ai_generation_slots_user_window_idx ON ai_generation_slots (user_id, reserved_at)
+    WHERE status IN ('reserved', 'consumed');
+CREATE INDEX ai_generation_slots_meeting_idx ON ai_generation_slots (meeting_id) WHERE status = 'reserved';
 
 CREATE TABLE exports (
     id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),

@@ -13,6 +13,7 @@ struct DetailData {
     let edits: [DocumentKind: PendingDocumentEdit]
     let isOnline: Bool
     let uploadProgress: Double?
+    var aiSlotBlocked = false
 
     func currentRevision(_ kind: DocumentKind) -> DocumentRevision? {
         guard let doc = documents[kind] else { return nil }
@@ -43,7 +44,8 @@ struct DetailData {
             hasTranscript: meeting.hasTranscript || transcript != nil,
             hasAINotes: documents[.aiNotes] != nil,
             transcribeJob: job(.transcribe),
-            notesJob: job(.generateNotes)
+            notesJob: job(.generateNotes),
+            aiSlotBlocked: aiSlotBlocked
         )
     }
 
@@ -80,10 +82,12 @@ struct MeetingDetailView: View {
     @Query private var jobs: [ProcessingJob]
     @Query private var uploads: [PendingUpload]
     @Query private var edits: [PendingDocumentEdit]
+    @Query private var intents: [PendingIntent]
     @SceneStorage private var tabRaw: String
     @State private var model: MeetingDetailModel
     @State private var player = PlayerModel()
     @AccessibilityFocusState private var titleFocused: Bool
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     init(meetingID: UUID) {
         self.meetingID = meetingID
@@ -94,6 +98,7 @@ struct MeetingDetailView: View {
         _jobs = Query(filter: #Predicate<ProcessingJob> { $0.meetingID == meetingID }, sort: \ProcessingJob.updatedAt, order: .reverse)
         _uploads = Query(filter: #Predicate<PendingUpload> { $0.meetingID == meetingID })
         _edits = Query(filter: #Predicate<PendingDocumentEdit> { $0.meetingID == meetingID })
+        _intents = Query(filter: #Predicate<PendingIntent> { $0.meetingID == meetingID })
         _tabRaw = SceneStorage(wrappedValue: DetailTab.transcript.rawValue, "detail.tab.\(meetingID.lower)")
         _model = State(initialValue: MeetingDetailModel(meetingID: meetingID))
     }
@@ -120,9 +125,12 @@ struct MeetingDetailView: View {
             pendingUpload: uploads.first,
             edits: editMap,
             isOnline: app.isOnline,
-            uploadProgress: app.uploads.progress(meetingID: meetingID)
+            uploadProgress: app.uploads.progress(meetingID: meetingID),
+            aiSlotBlocked: aiSlotBlocked
         )
     }
+
+    private var aiSlotBlocked: Bool { intents.contains(where: IntentSender.isBlockedByAILimit) }
 
     private var contentKey: String {
         let docs = documents.map { "\($0.kindRaw)\($0.currentRevisionNumber)" }.sorted().joined()
@@ -179,42 +187,60 @@ struct MeetingDetailView: View {
             guard !old, new else { return }
             AccessibilityNotification.Announcement(LS("detail.transcript.ready", table: .meetingDetail)).post()
         }
+        .onChange(of: aiSlotBlocked) { old, new in
+            if !old, new { model.showAIChoice = true }
+        }
+        .task(id: aiSlotBlocked) {
+            if aiSlotBlocked, app.isOnline { _ = await app.refreshUsage() }
+        }
     }
 
     @ViewBuilder private func content(_ data: DetailData) -> some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: Spacing.lg, pinnedViews: [.sectionHeaders]) {
-                DetailHeader(meeting: data.meeting, model: model, titleFocused: $titleFocused)
-                PipelineStrip(stage: data.stage)
-                stageBanners(data)
-                PlayerCard(player: player, availability: data.playback, meetingID: meetingID, durationMs: data.meeting.durationMs)
-                Section {
-                    Group {
-                        switch tab.wrappedValue {
-                        case .transcript: TranscriptTab(data: data, model: model, player: player)
-                        case .notes: NotesTab(data: data, model: model, player: player)
-                        case .mom: MoMTab(data: data, model: model)
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: Spacing.lg, pinnedViews: [.sectionHeaders]) {
+                    DetailHeader(meeting: data.meeting, model: model, titleFocused: $titleFocused)
+                    PipelineStrip(stage: data.stage)
+                    stageBanners(data)
+                    PlayerCard(player: player, availability: data.playback, meetingID: meetingID, durationMs: data.meeting.durationMs)
+                    Section {
+                        Group {
+                            switch tab.wrappedValue {
+                            case .transcript: TranscriptTab(data: data, model: model, player: player)
+                            case .notes: NotesTab(data: data, model: model, player: player)
+                            case .mom: MoMTab(data: data, model: model)
+                            }
                         }
+                        .transition(.opacity)
+                    } header: {
+                        Picker(selection: tab) {
+                            Text(L("detail.tab.transcript", table: .meetingDetail)).tag(DetailTab.transcript)
+                            Text(L("detail.tab.notes", table: .meetingDetail)).tag(DetailTab.notes)
+                            Text(L("detail.tab.mom", table: .meetingDetail)).tag(DetailTab.mom)
+                        } label: {
+                            Text(L("detail.tabs.a11y", table: .meetingDetail))
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.vertical, Spacing.sm)
+                        .background(Palette.bg)
                     }
-                    .transition(.opacity)
-                } header: {
-                    Picker(selection: tab) {
-                        Text(L("detail.tab.transcript", table: .meetingDetail)).tag(DetailTab.transcript)
-                        Text(L("detail.tab.notes", table: .meetingDetail)).tag(DetailTab.notes)
-                        Text(L("detail.tab.mom", table: .meetingDetail)).tag(DetailTab.mom)
-                    } label: {
-                        Text(L("detail.tabs.a11y", table: .meetingDetail))
-                    }
-                    .pickerStyle(.segmented)
-                    .padding(.vertical, Spacing.sm)
-                    .background(Palette.bg)
                 }
+                .padding(.horizontal, Spacing.screenInsetCompact)
+                .padding(.bottom, Spacing.xxl)
+                .readingWidth()
             }
-            .padding(.horizontal, Spacing.screenInsetCompact)
-            .padding(.bottom, Spacing.xxl)
-            .readingWidth()
+            .onChange(of: model.scrollTarget) { _, target in
+                guard let target else { return }
+                withAnimation(Motion.standard(reduceMotion: reduceMotion)) { proxy.scrollTo(target, anchor: .center) }
+                model.scrollTarget = nil
+            }
         }
         .onAppear { titleFocused = true }
+        .sheet(isPresented: $model.showAIChoice) {
+            AISlotChoiceSheet(durationMs: data.meeting.durationMs ?? data.pendingUpload?.durationMs) {
+                Task { await model.startTranscription(language: data.meeting.transcriptionLanguage, notes: .skip, app: app) }
+            }
+        }
         .sheet(isPresented: $model.showMetadata) { MetadataSheet(data: data) }
         .sheet(isPresented: Binding(get: { data.meeting.metadataConflict }, set: { _ in })) {
             MetadataConflictSheet(meeting: data.meeting)
@@ -306,6 +332,9 @@ struct MeetingDetailView: View {
         } else if meeting.localPhase == .waitingConnection || (meeting.localPhase == .queued && !data.isOnline) {
             Banner(tone: .warning, systemImage: "wifi.slash", message: L("detail.upload.waiting", table: .meetingDetail))
         }
+        if DetailStatus.transcript(data.stage) == .waitingAISlot {
+            aiSlotBanner(data)
+        }
         if meeting.localPhase == .waitingQuota {
             Banner(
                 tone: .warning,
@@ -320,6 +349,27 @@ struct MeetingDetailView: View {
                 message: L("detail.entitlement.expired", table: .meetingDetail),
                 actions: quotaActions
             )
+        }
+    }
+
+    private func aiSlotBanner(_ data: DetailData) -> some View {
+        let allowance = app.usage.map { AIAllowance($0.aiGenerations) }
+        let available = allowance.map { !$0.isExhausted } ?? false
+        var text = LS(available ? "ai.slot.banner.available" : "ai.slot.banner.body", table: .meetingDetail)
+        if let next = allowance?.nextSlotText() { text += " " + next + "." }
+        let start = BannerAction(L("ai.slot.banner.start", table: .meetingDetail), isLoading: model.generating.contains(.transcribe)) {
+            Task { await model.startTranscription(language: data.meeting.transcriptionLanguage, app: app) }
+        }
+        let choose = BannerAction(L("ai.slot.banner.choose", table: .meetingDetail)) { model.showAIChoice = true }
+        return VStack(alignment: .leading, spacing: Spacing.sm) {
+            Banner(
+                tone: .warning,
+                systemImage: "hourglass",
+                title: L("ai.slot.banner.title", table: .meetingDetail),
+                message: LocalizedStringResource(String.LocalizationValue(text), table: "Verbatim"),
+                actions: data.isOnline ? (available ? [start] : [choose]) : []
+            )
+            if let key = model.actionErrors[.transcribe] { ActionErrorText(key: key) }
         }
     }
 

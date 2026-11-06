@@ -82,7 +82,7 @@ func TestSignInAppleFirstAndRepeat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !r.Created || !strings.HasPrefix(r.Token, "phb_") || r.User.DisplayName != "Ari Rudiana" ||
+	if !r.Created || len(r.AccessToken) != 43 || len(r.RefreshToken) != 43 || r.AccessToken == r.RefreshToken || r.User.DisplayName != "Ari Rudiana" ||
 		r.User.Language != "id" || r.User.Timezone != "Asia/Jakarta" {
 		t.Fatalf("first sign-in %+v %+v", r, r.User)
 	}
@@ -95,20 +95,21 @@ func TestSignInAppleFirstAndRepeat(t *testing.T) {
 		t.Fatalf("trial period %v days", days)
 	}
 
-	var hash, enc []byte
-	if err := e.pool.QueryRow(ctx, `SELECT s.token_hash, u.apple_refresh_token_enc FROM sessions s JOIN users u ON u.id=s.user_id WHERE u.id=$1`,
-		r.User.ID).Scan(&hash, &enc); err != nil {
+	var hash, rhash, enc []byte
+	if err := e.pool.QueryRow(ctx, `SELECT t.access_token_hash, t.refresh_token_hash, u.apple_refresh_token_enc
+		FROM session_tokens t JOIN sessions s ON s.id=t.session_id JOIN users u ON u.id=s.user_id WHERE u.id=$1`,
+		r.User.ID).Scan(&hash, &rhash, &enc); err != nil {
 		t.Fatal(err)
 	}
-	if !bytes.Equal(hash, hashToken(r.Token)) {
-		t.Fatal("session must store sha256(token)")
+	if !bytes.Equal(hash, hashToken(r.AccessToken)) || !bytes.Equal(rhash, hashToken(r.RefreshToken)) {
+		t.Fatal("session must store sha256 of both tokens")
 	}
 	c, _ := NewAppleClient(e.cfg)
 	if tok, err := c.Open(enc); err != nil || tok != "rt-secret-1" {
 		t.Fatalf("stored refresh token: %q %v", tok, err)
 	}
 
-	uid, sid, err := e.svc.ResolveSession(ctx, r.Token)
+	uid, sid, err := e.svc.ResolveSession(ctx, r.AccessToken)
 	if err != nil || uid != r.User.ID || sid == "" {
 		t.Fatalf("resolve: %s %s %v", uid, sid, err)
 	}
@@ -118,7 +119,7 @@ func TestSignInAppleFirstAndRepeat(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if r2.Created || r2.User.ID != r.User.ID || r2.User.DisplayName != "Ari Rudiana" || r2.Token == r.Token {
+	if r2.Created || r2.User.ID != r.User.ID || r2.User.DisplayName != "Ari Rudiana" || r2.AccessToken == r.AccessToken {
 		t.Fatalf("repeat sign-in %+v %+v", r2, r2.User)
 	}
 	_ = e.pool.QueryRow(ctx, `SELECT apple_refresh_token_enc FROM users WHERE id=$1`, r.User.ID).Scan(&enc)
@@ -212,7 +213,7 @@ func TestTrialAbuseDeleteAndResignIn(t *testing.T) {
 	if _, err := e.pool.Exec(ctx, `UPDATE users SET deleted_at=now() WHERE id=$1`, r.User.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := e.svc.ResolveSession(ctx, r.Token); !apperr.Is(err, apperr.Unauthenticated) {
+	if _, _, err := e.svc.ResolveSession(ctx, r.AccessToken); !apperr.Is(err, apperr.SessionRevoked) {
 		t.Fatalf("tombstoned user session: %v", err)
 	}
 	r2, err := e.signIn(t, "001.eve", nil, nil)
@@ -311,13 +312,13 @@ func TestResolveSessionAndLogout(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, sid, err := e.svc.ResolveSession(ctx, r.Token)
+	_, sid, err := e.svc.ResolveSession(ctx, r.AccessToken)
 	if err != nil {
 		t.Fatal(err)
 	}
 	other, _ := e.svc.SignInDev(ctx, "bob")
 
-	for _, tok := range []string{"", "phb_unknown", "nope", r.Token + "x"} {
+	for _, tok := range []string{"", "unknown", r.AccessToken + "x", r.RefreshToken} {
 		if _, _, err := e.svc.ResolveSession(ctx, tok); !apperr.Is(err, apperr.Unauthenticated) {
 			t.Errorf("%q: %v", tok, err)
 		}
@@ -325,23 +326,25 @@ func TestResolveSessionAndLogout(t *testing.T) {
 	if err := e.svc.Logout(ctx, sid); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := e.svc.ResolveSession(ctx, r.Token); !apperr.Is(err, apperr.Unauthenticated) {
-		t.Fatalf("revoked: %v", err)
+	if _, _, err := e.svc.ResolveSession(ctx, r.AccessToken); !apperr.Is(err, apperr.SessionRevoked) {
+		t.Fatalf("revoked access: %v", err)
 	}
-	if _, _, err := e.svc.ResolveSession(ctx, other.Token); err != nil {
-		t.Fatalf("logout must revoke only the calling session: %v", err)
+	if _, err := e.svc.Refresh(ctx, r.RefreshToken); !apperr.Is(err, apperr.SessionRevoked) {
+		t.Fatalf("revoked refresh: %v", err)
 	}
-	if _, err := e.pool.Exec(ctx, `UPDATE sessions SET created_at=now()-interval '2 days', expires_at=now()-interval '1 second' WHERE token_hash=$1`, hashToken(other.Token)); err != nil {
-		t.Fatal(err)
+	if _, _, err := e.svc.ResolveSession(ctx, other.AccessToken); err != nil {
+		t.Fatalf("logout must revoke only the calling session family: %v", err)
 	}
-	if _, _, err := e.svc.ResolveSession(ctx, other.Token); !apperr.Is(err, apperr.Unauthenticated) {
-		t.Fatalf("expired: %v", err)
+	var reason string
+	_ = e.pool.QueryRow(ctx, `SELECT revoked_reason FROM sessions WHERE id=$1`, sid).Scan(&reason)
+	if reason != "logout" {
+		t.Fatalf("reason %q", reason)
 	}
 
 	var secs float64
-	r3, _ := e.svc.SignInDev(ctx, "bob")
-	_ = e.pool.QueryRow(ctx, `SELECT extract(epoch FROM expires_at - created_at) FROM sessions WHERE token_hash=$1`, hashToken(r3.Token)).Scan(&secs)
-	if int64(secs+0.5) != int64(e.cfg.SessionTTL.Seconds()) {
-		t.Fatalf("session ttl %v", secs)
+	_ = e.pool.QueryRow(ctx, `SELECT extract(epoch FROM s.expires_at - s.created_at) FROM sessions s JOIN session_tokens t ON t.session_id=s.id
+		WHERE t.access_token_hash=$1`, hashToken(other.AccessToken)).Scan(&secs)
+	if int64(secs+0.5) != int64(e.cfg.SessionMaxAge.Seconds()) {
+		t.Fatalf("session max age %v", secs)
 	}
 }

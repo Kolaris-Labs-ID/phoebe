@@ -97,6 +97,7 @@ func RegisterWorker(ctx context.Context, r *jobs.Runner, cfg *config.Config, log
 	r.RegisterSweep("audio_retention", ms.RetentionSweep)
 	r.RegisterSweep("byte_purge", ms.BytePurgeSweep)
 	r.RegisterSweep("orphans", ms.OrphanSweep)
+	r.RegisterSweep("sessions", auth.NewService(pool, cfg, log, apple).SessionSweep)
 	r.RegisterSweep("alerts", jobs.AlertSweep(pool, log, cfg.AlertQueueAge, cfg.AlertDailyCostUSD))
 	return nil
 }

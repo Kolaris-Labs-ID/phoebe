@@ -52,7 +52,7 @@ Feature placeholders live in `Phoebe/Features/<Area>/<Area>PlaceholderView.swift
   - `completeOnboarding()`. It sets the flag, logs `onboarding_completed` and moves to `.signedIn`.
 - `updateUser(_:)` caches the user and upserts `UserProfile`.
 - `signOut(reason:callServer:)` calls `POST /v1/auth/logout` when `callServer` is true, clears the Keychain session, drops the store and services, and moves to `.signedOut`.
-- Any 401 from an authenticated endpoint goes through `APIClient.onUnauthenticated` to `handleUnauthenticated()`, which signs out with `.unauthenticated` and no server call.
+- A terminal 401 (`unauthenticated`, `session_revoked`, `session_expired`, or any 401 from `POST /v1/auth/refresh`) goes through `APIClient.onUnauthenticated` to `handleUnauthenticated()`, which signs out with `.unauthenticated` and no server call (ignored while a sign-out is running). `401 access_token_expired` never gets here: `APIClient` refreshes and retries once. A refresh that fails on the network keeps the session.
 - Launch runs `start()` once: connectivity, the Apple revocation observer and the config fetch. While signed in, `runSignedInLaunchTasks()` runs these in order: recovery, Apple credential state check (Apple sessions only), `uploads.resumeAll`, `sync.fullPull`, `refreshUsage`, `events.flush`.
 - `scenePhaseChanged`. On `.active` it calls `poller.setForeground(true)`, `reset()`, `recorder.retryPendingMerges()`, `uploads.resumeAll()` and `events.flush()`. On `.background` it calls `poller.setForeground(false)`.
 - In Release, the base URL must be `https` or the app stops at launch. Debug uses `http://localhost:8080`. `APIClient.devLoginEnabled` is true only when the build is DEBUG and `PhoebeDevLogin == "1"`.
@@ -137,7 +137,7 @@ For background `URLSession` relaunches, `AppDelegate` stores the system completi
 - Types:
   - Containers: `ManualNotesContent`, `AINotesContent`, `MoMContent`, `MeetingInfo`
   - Items: `NoteItem`, `NotesSection`, `MoMSection` (its `items` decode by section type), `MoMItem` (`.text/.topic/.action`), `TextItem`, `TopicItem`, `ActionItem`
-  - Enums: `SectionType`, `ListStyle`, `Origin`, `SourceRef` (`.transcript(segmentId:startMs:endMs:)`, `.userNotes(noteId:)`)
+  - Enums: `SectionType`, `ListStyle`, `Origin`, `SourceRef` (`.transcript(segmentId:startMs:endMs:approximate:)`, `approximate` defaults to `false` and is set by the server; `.userNotes(noteId:)`)
   - `DocumentKind` (`manual_notes/ai_notes/mom`)
 - Nullable keys are always encoded as `null`.
 - Editing rules:
@@ -152,7 +152,8 @@ For background `URLSession` relaunches, `AppDelegate` stores the system completi
 - `APIClient` (Sendable):
   - `send(Endpoint<R>) async throws -> R`. It always throws `APIError`.
   - `sendDelete(_:) -> R?`. A 404 returns `nil`, which counts as success.
-  - `makeRequest(_:)` returns a `URLRequest` with auth and headers, for background upload tasks.
+  - `authorizedRequest(_:minValidity:)` (async) returns a `URLRequest` whose bearer stays valid ≥ `minValidity` (default 300 s), refreshing first; for background upload tasks. `makeRequest(_:token:)` builds one with an explicit token.
+  - Sessions: `init(baseURL:session:tokens: any TokenStore, now:keepAlive:onUnauthenticated:)` (`keepAlive` begins a background task around each rotation; default `APIClient.backgroundActivity`). `TokenRefresher` (actor) does single-flight `POST /v1/auth/refresh`; `send` refreshes when the access token expires within 60 s and on `401 access_token_expired` (retry once).
   - `handle(_:data:response:)` decodes a background task result into `R` or throws `APIError`.
 - `APICoding.encoder()/decoder()`: snake_case conversion, RFC3339 dates with milliseconds, sorted keys. `APICoding.encode(_:)` returns `Data` and `parseDate/formatDate`. Property names end in `Id`, never `ID`. `UUID.lower` gives the lowercase form for paths, headers and bodies.
 - `Endpoints.*` covers every api.md route:
@@ -174,13 +175,13 @@ For background `URLSession` relaunches, `AppDelegate` stores the system completi
   - `Patch<T>` has three cases: `.unchanged` (key omitted), `.set(T)` and `.clear` (`null`).
   - `MeetingPatchRequest` has `expectedMetadataRevision`, `title`, `startedAt`, `timezone`, `language`, `participants`, `folderId` and `tagIds`, plus `hasMetadataChanges` and `isEmpty`.
 - `APIError`:
-  - One case per api §1.2 code, with typed details such as `.revisionConflict(currentRevisionNumber:currentRevisionId:)`, `.uploadOffsetMismatch(receivedBytes:)`, `.quotaExceeded(...)`, `.rateLimited(retryAfterSeconds:)`, `.validationFailed([FieldError])` and `.invalidContent(path:reason:)`.
+  - One case per api §1.2 code, with typed details such as `.revisionConflict(currentRevisionNumber:currentRevisionId:)`, `.uploadOffsetMismatch(receivedBytes:)`, `.quotaExceeded(...)`, `.aiGenerationLimit(nextSlotAt:)`, `.validationFailed([FieldError])` and `.invalidContent(path:reason:)`.
   - Local cases: `.offline`, `.transport`, `.timeout`, `.decoding`, plus `.server(status:code:)` for unknown codes.
   - `isAmbiguous` is true for transport, timeout and 5xx; retry the identical request. `code` is the stable string to localize the UI by. Never show the server `message`.
 - `AuthStore` (Keychain, `AfterFirstUnlockThisDeviceOnly`):
-  - Read-only properties: `token`, `appleUserID`, `pendingDisplayName`, `signInMethod`, `userID`.
+  - Read-only properties: `tokens: TokenPairDTO?` (access + refresh token and expiries, one Keychain item), `appleUserID`, `pendingDisplayName`, `signInMethod`, `userID`. Conforms to `TokenStore` (`tokens`, `saveTokens(_:)`).
   - `value(for:)` / `set(_:for:)` read and write any key.
-  - `saveSession(...)` and `clearSession()`. `clearSession()` keeps `pendingDisplayName`.
+  - `saveSession(tokens:userID:method:)` and `clearSession()`. `clearSession()` keeps `pendingDisplayName`.
 
 ## Sync helpers
 
@@ -201,7 +202,7 @@ No raw hex values in views.
 - **Typography:** `Typography.display/title/headline/body/callout/subheadline/footnote/caption`, `.timerTextStyle()` (@ScaledMetric 56, capped at 88, monospaced digits), `.readingTextStyle()` (body + lineSpacing 4).
 - **Formatting:**
   - `timer(ms:)` returns `mm:ss`, or `h:mm:ss` from one hour.
-  - `timestamp(ms:)` returns the same text; `reference(ms:)` returns `[mm:ss]`.
+  - `timestamp(ms:approximate:)` returns the same text, `~mm:ss` when approximate; `reference(ms:approximate:)` returns `[mm:ss]` / `[~mm:ss]`; `spokenTimestamp(ms:approximate:)` prefixes "sekitar" / "about" (Common `time.approximate.a11y`).
   - `spokenDuration(ms:locale:includeSeconds:)` returns, for example, "12 menit, 4 detik".
   - `deadline(date:phrase:locale:)` returns "13 Nov 2026 (minggu depan)", the phrase alone, or "Belum ditentukan".
   - `notDetermined(_:)`, `parseDay`, `dayString`, `quotaMinutes(seconds:)`.

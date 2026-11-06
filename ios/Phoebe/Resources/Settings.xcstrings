@@ -1,6 +1,74 @@
 {
   "sourceLanguage": "en",
   "strings": {
+    "ai.allowance.footnote": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Automatic notes and each notes or minutes generation or regeneration use one."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Catatan otomatis serta setiap pembuatan atau pembuatan ulang catatan dan MoM memakai satu."
+          }
+        }
+      }
+    },
+    "ai.allowance.label": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld AI generations per %2$lld hours"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld generasi AI per %2$lld jam"
+          }
+        }
+      }
+    },
+    "ai.allowance.left": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%lld left"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sisa %lld"
+          }
+        }
+      }
+    },
+    "ai.allowance.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next slot available %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slot berikutnya tersedia %@"
+          }
+        }
+      }
+    },
     "plan.status.active": {
       "extractionState": "manual",
       "localizations": {
@@ -116,23 +184,6 @@
           "stringUnit": {
             "state": "translated",
             "value": "Login pengembang"
-          }
-        }
-      }
-    },
-    "settings.ai.limit": {
-      "extractionState": "manual",
-      "localizations": {
-        "en": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "AI regenerations: %1$lld of %2$lld (24 hours)"
-          }
-        },
-        "id": {
-          "stringUnit": {
-            "state": "translated",
-            "value": "Pembuatan ulang AI: %1$lld dari %2$lld (24 jam)"
           }
         }
       }

@@ -6,7 +6,7 @@ enum IntentSender {
     enum Outcome: Equatable {
         case done
         case retryLater(APIError?)
-        case waiting(String)
+        case waiting(APIError)
         case rejected(APIError)
         case missing
         case skipped
@@ -38,6 +38,16 @@ enum IntentSender {
             finish(key: key, store: store)
             return .done
         } catch let error as APIError {
+            // Nothing was reserved: a transcribe intent stays queued until the user picks wait or transcribe-only; notes/MoM are retried by the user.
+            if error.isAIGenerationLimit {
+                guard type == .transcribe else {
+                    finish(key: key, store: store, resetPhase: false)
+                    return .rejected(error)
+                }
+                store.intent(key: key)?.lastErrorCode = error.code
+                store.save()
+                return .waiting(error)
+            }
             switch error {
             case .alreadyTranscribed, .jobInProgress:
                 finish(key: key, store: store)
@@ -45,7 +55,7 @@ enum IntentSender {
             case .audioNotReady:
                 return .retryLater(error)
             case .quotaExceeded, .entitlementInactive:
-                guard let current = store.intent(key: key) else { return .waiting(error.code) }
+                guard let current = store.intent(key: key) else { return .waiting(error) }
                 current.lastErrorCode = error.code
                 if type == .transcribe, let meeting = store.meeting(meetingID) {
                     meeting.localPhase = error.code == "entitlement_inactive" ? .waitingEntitlement : .waitingQuota
@@ -55,7 +65,7 @@ enum IntentSender {
                     env.app.events.log(.quotaBlocked, meetingID: meetingID)
                 }
                 store.save()
-                return .waiting(error.code)
+                return .waiting(error)
             case .idempotencyKeyReused:
                 if let current = store.intent(key: key) {
                     current.idempotencyKey = UUID()
@@ -99,4 +109,19 @@ enum IntentSender {
     static func language(of intent: PendingIntent) -> TranscriptionLanguage? {
         (try? APICoding.decoder().decode(TranscriptionRequest.self, from: intent.body))?.language
     }
+
+    static func notes(of intent: PendingIntent) -> NotesMode {
+        (try? APICoding.decoder().decode(TranscriptionRequest.self, from: intent.body))?.notes ?? .auto
+    }
+
+    static func isBlockedByAILimit(_ intent: PendingIntent) -> Bool {
+        intent.type == .transcribe && intent.lastErrorCode == aiGenerationLimitCode
+    }
+
+    nonisolated static let aiGenerationLimitCode = "ai_generation_limit"
+}
+
+extension APIError {
+    // Matched by code so it holds whether or not APIError gains a typed case for it.
+    var isAIGenerationLimit: Bool { code == IntentSender.aiGenerationLimitCode }
 }

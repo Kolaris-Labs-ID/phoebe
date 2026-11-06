@@ -7,7 +7,7 @@ import Testing
         UsageDTO(
             entitlement: EntitlementDTO(plan: "trial", status: status, periodStart: nil, periodEnd: nil, quotaSeconds: 7200),
             consumedSeconds: 0, reservedSeconds: 0, remainingSeconds: remaining,
-            aiGenerations: AIGenerationsDTO(limitPerDay: 30, usedLast24h: 0, nextAvailableAt: nil)
+            aiGenerations: AIGenerationsDTO(limit: 30, windowHours: 24, used: 0, reserved: 0, remaining: 30, nextSlotAt: nil)
         )
     }
 

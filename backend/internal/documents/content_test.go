@@ -3,6 +3,7 @@ package documents
 import (
 	"encoding/json"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -98,7 +99,7 @@ func TestValidateMoMNormalizes(t *testing.T) {
 	s := string(out)
 	for _, want := range []string{
 		`"style":null`, `"pic":null`, `"deadline_phrase":null`, `"items":[]`,
-		`{"type":"transcript","segment_id":"s1","start_ms":0,"end_ms":4200}`,
+		`{"type":"transcript","segment_id":"s1","start_ms":0,"end_ms":4200,"approximate":false}`,
 		`{"type":"user_notes","note_id":"n1"}`, `"started_at":"2026-11-06T02:00:00.000Z"`,
 	} {
 		if !strings.Contains(s, want) {
@@ -286,6 +287,38 @@ func TestValidateAINotes(t *testing.T) {
 	assertContentErr(t, err, "/sections/0/style", apperr.ReasonInvalid)
 	_, err = ValidateContent(KindAINotes, []byte(strings.Replace(body, `"style":"bullet",`, `"style":null,`, 1)), testPins)
 	assertContentErr(t, err, "/sections/0/style", apperr.ReasonInvalid)
+}
+
+func TestValidateApproximateFromPins(t *testing.T) {
+	body := `{"schema_version":1,"language":"id","sections":[{"id":"sec_1","heading":"Budget","style":"bullet","items":[
+	  {"id":"it_1","text":"Naik 10%.","origin":"ai","edited":false,"sources":[
+	    {"type":"transcript","segment_id":"s2","approximate":false},{"type":"user_notes","note_id":"n1","approximate":true}]}]}]}`
+	chunk := testPins
+	chunk.Approximate = true
+	for _, tc := range []struct {
+		pins Pins
+		want bool
+	}{{chunk, true}, {testPins, false}} {
+		c, err := ValidateContent(KindAINotes, []byte(strings.Replace(body, `"approximate":false`, `"approximate":`+strconv.FormatBool(!tc.want), 1)), tc.pins)
+		if err != nil {
+			t.Fatal(err)
+		}
+		refs := c.(*AINotes).Sections[0].Items[0].Sources
+		if refs[0].Approximate != tc.want || refs[1].Approximate {
+			t.Fatalf("pins approximate=%v: refs %+v", tc.pins.Approximate, refs)
+		}
+		out, _ := json.Marshal(c)
+		wantRef := `{"type":"transcript","segment_id":"s2","start_ms":61000,"end_ms":66000,"approximate":` + strconv.FormatBool(tc.want) + `}`
+		if !strings.Contains(string(out), wantRef) || !strings.Contains(string(out), `{"type":"user_notes","note_id":"n1"}`) {
+			t.Fatalf("marshaled refs: %s", out)
+		}
+		back, err := DecodeContent(KindAINotes, out)
+		if err != nil || !reflect.DeepEqual(back, c) {
+			t.Fatalf("round trip: %v", err)
+		}
+	}
+	_, err := ValidateContent(KindAINotes, []byte(strings.Replace(body, `"approximate":false`, `"approximate":"yes"`, 1)), chunk)
+	assertContentErr(t, err, "/sections/0/items/0/sources/0/approximate", apperr.ReasonInvalid)
 }
 
 func assertContentErr(t *testing.T, err error, path, reason string) {

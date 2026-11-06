@@ -32,7 +32,7 @@ func (s *Service) Delete(ctx context.Context, userID string) (time.Time, error) 
 		if err := usage.ReleaseUser(ctx, tx, userID); err != nil {
 			return err
 		}
-		if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = now() WHERE user_id = $1 AND revoked_at IS NULL`, userID); err != nil {
+		if _, err := tx.Exec(ctx, `UPDATE sessions SET revoked_at = now(), revoked_reason = 'account_deleted' WHERE user_id = $1 AND revoked_at IS NULL`, userID); err != nil {
 			return err
 		}
 		tag, err := tx.Exec(ctx, `UPDATE users SET deleted_at = now(), updated_at = now() WHERE id = $1 AND deleted_at IS NULL`, userID)

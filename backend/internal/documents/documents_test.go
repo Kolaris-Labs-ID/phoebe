@@ -359,17 +359,11 @@ func TestGenerateEndpointRules(t *testing.T) {
 	}
 }
 
-func TestAIRateLimitRace(t *testing.T) {
-	e := newDEnv(t, nil, func(c *config.Config) { c.AIUserJobsPerDay = 3 })
+func TestGenerationSlotRace(t *testing.T) {
+	e := newDEnv(t, nil, func(c *config.Config) { c.AIGenerationLimit = 3 })
 	u := testutil.CreateUser(t, e.pool, 0)
-	for range 2 {
-		m, _ := e.seedMeeting(t, u.ID, seedSegments)
-		if _, err := e.pool.Exec(bg, `INSERT INTO jobs (type, user_id, meeting_id, trigger, status, idempotency_key,
-			request_fingerprint, max_attempts, correlation_id, finished_at, last_error_category)
-			VALUES ('generate_notes', $1, $2, 'user', 'failed', $3, repeat('c', 64), 3, gen_random_uuid(), now(), 'internal')`,
-			u.ID, m, ids.New()); err != nil {
-			t.Fatal(err)
-		}
+	if _, err := e.pool.Exec(bg, `INSERT INTO ai_generation_slots (user_id, status, consumed_at) VALUES ($1, 'consumed', now()), ($1, 'consumed', now())`, u.ID); err != nil {
+		t.Fatal(err)
 	}
 	const n = 8
 	var mids []string
@@ -379,8 +373,14 @@ func TestAIRateLimitRace(t *testing.T) {
 	}
 	var wg sync.WaitGroup
 	errs := make([]error, n)
+	kinds := []Kind{KindAINotes, KindMoM}
 	for i := range n {
-		wg.Go(func() { _, _, errs[i] = e.generate(t, u.ID, mids[i], KindAINotes, ids.New(), `{}`) })
+		if kinds[i%2] == KindMoM {
+			e.mustPut(t, u.ID, mids[i], KindAINotes, putBody(0, -1, ids.New(), json.RawMessage(`{"schema_version":1,"language":"id","sections":[]}`)))
+		}
+	}
+	for i := range n {
+		wg.Go(func() { _, _, errs[i] = e.generate(t, u.ID, mids[i], kinds[i%2], ids.New(), `{}`) })
 	}
 	wg.Wait()
 	ok := 0
@@ -388,15 +388,107 @@ func TestAIRateLimitRace(t *testing.T) {
 		switch code(err) {
 		case "":
 			ok++
-		case apperr.RateLimited:
-			if s, _ := details(err)["retry_after_seconds"].(int64); s < 1 {
-				t.Fatal(details(err))
+		case apperr.AIGenerationLimit:
+			if d := details(err); d["limit"] != 3 || d["remaining"] != 0 || d["next_slot_at"] == nil {
+				t.Fatal(d)
 			}
 		default:
 			t.Fatal(err)
 		}
 	}
-	if ok != 1 {
-		t.Fatalf("%d generates succeeded at limit-1", ok)
+	if ok != 1 || e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1 AND status = 'reserved'`, u.ID) != 1 ||
+		e.count(t, `SELECT count(*) FROM jobs WHERE user_id = $1 AND type IN ('generate_notes', 'generate_mom')`, u.ID) != 1 {
+		t.Fatalf("%d generates succeeded at remaining=1", ok)
+	}
+	if e.remaining(t, u.ID) != 0 {
+		t.Fatal("remaining")
+	}
+}
+
+func TestGenerateSlotIdempotency(t *testing.T) {
+	e := newDEnv(t, nil, nil)
+	u := testutil.CreateUser(t, e.pool, 0)
+	mid, _ := e.seedMeeting(t, u.ID, seedSegments)
+	key := ids.New()
+	g1, created, err := e.generate(t, u.ID, mid, KindAINotes, key, `{}`)
+	if err != nil || !created {
+		t.Fatal(err)
+	}
+	var wg sync.WaitGroup
+	for range 6 {
+		wg.Go(func() {
+			if g, created, err := e.generate(t, u.ID, mid, KindAINotes, key, `{}`); err != nil || created || g.ID != g1.ID {
+				t.Error("replay", err, created)
+			}
+		})
+	}
+	wg.Wait()
+	if _, _, err := e.generate(t, u.ID, mid, KindAINotes, ids.New(), `{}`); code(err) != apperr.JobInProgress {
+		t.Fatal(err)
+	}
+	if e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, u.ID) != 1 || e.slot(t, g1.ID) != "reserved" ||
+		e.remaining(t, u.ID) != e.cfg.AIGenerationLimit-1 {
+		t.Fatal("duplicates must not take slots")
+	}
+	e.runAll(t)
+	if e.slot(t, g1.ID) != "consumed" || e.remaining(t, u.ID) != e.cfg.AIGenerationLimit-1 {
+		t.Fatal("success consumes the slot")
+	}
+}
+
+func TestGenerateFromTranscriptReady(t *testing.T) {
+	e := newDEnv(t, nil, nil)
+	u := testutil.CreateUser(t, e.pool, 0)
+	mid, _ := e.seedMeeting(t, u.ID, seedSegments)
+	if _, err := e.pool.Exec(bg, `UPDATE meetings SET pipeline_state = 'transcript_ready' WHERE id = $1`, mid); err != nil {
+		t.Fatal(err)
+	}
+	g, created, err := e.generate(t, u.ID, mid, KindAINotes, ids.New(), `{}`)
+	if err != nil || !created || e.state(t, mid) != meetings.StateGeneratingNotes || e.slot(t, g.ID) != "reserved" {
+		t.Fatal(err, e.state(t, mid))
+	}
+	e.runAll(t)
+	if e.job(t, g.ID).Status != jobs.StatusSucceeded || e.state(t, mid) != meetings.StateNotesReady || e.slot(t, g.ID) != "consumed" {
+		t.Fatal(e.state(t, mid))
+	}
+}
+
+func TestReservedAutoNotesFinishesAtLimit(t *testing.T) {
+	e := newDEnv(t, nil, func(c *config.Config) { c.AIGenerationLimit = 2 })
+	u := testutil.CreateUser(t, e.pool, 0)
+	mid, tr := e.seedMeeting(t, u.ID, seedSegments)
+	if _, err := e.pool.Exec(bg, `UPDATE meetings SET pipeline_state = 'generating_notes' WHERE id = $1`, mid); err != nil {
+		t.Fatal(err)
+	}
+	var transcribeJob string
+	if err := e.pool.QueryRow(bg, `SELECT id FROM jobs WHERE meeting_id = $1 AND type = 'transcribe'`, mid).Scan(&transcribeJob); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.pool.Exec(bg, `INSERT INTO ai_generation_slots (user_id, meeting_id, transcribe_job_id) VALUES ($1, $2, $3)`,
+		u.ID, mid, transcribeJob); err != nil {
+		t.Fatal(err)
+	}
+	nj, err := jobs.Enqueue(bg, e.pool, jobs.NewJob{Type: jobs.TypeGenerateNotes, UserID: u.ID, MeetingID: mid, Trigger: jobs.TriggerSystem,
+		IdempotencyKey: "sys:notes:" + tr, MaxAttempts: jobs.AIMaxAttempts, CorrelationID: ids.New(),
+		Payload: Payload{TranscriptRevisionID: tr, Language: "id"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := e.pool.Exec(bg, `UPDATE ai_generation_slots SET job_id = $1 WHERE transcribe_job_id = $2`, nj.ID, transcribeJob); err != nil {
+		t.Fatal(err)
+	}
+	other, _ := e.seedMeeting(t, u.ID, seedSegments)
+	g, _, err := e.generate(t, u.ID, other, KindAINotes, ids.New(), `{}`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	third, _ := e.seedMeeting(t, u.ID, seedSegments)
+	if _, _, err := e.generate(t, u.ID, third, KindAINotes, ids.New(), `{}`); code(err) != apperr.AIGenerationLimit {
+		t.Fatal("limit reached by the other requests", err)
+	}
+	e.runAll(t)
+	if e.job(t, nj.ID).Status != jobs.StatusSucceeded || e.slot(t, nj.ID) != "consumed" || e.slot(t, g.ID) != "consumed" ||
+		e.state(t, mid) != meetings.StateNotesReady || e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, u.ID) != 2 {
+		t.Fatal("reserved auto notes must finish")
 	}
 }

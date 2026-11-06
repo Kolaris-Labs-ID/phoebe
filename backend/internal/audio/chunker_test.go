@@ -1,10 +1,11 @@
 package audio
 
 import (
-	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"testing"
 )
 
@@ -37,73 +38,48 @@ func TestCheckFFmpeg(t *testing.T) {
 	}
 }
 
-func TestChunkerSplit(t *testing.T) {
-	c := Chunker{FFmpegPath: ffmpegPath(t), ChunkSeconds: 2}
+func TestExtractSourceFormats(t *testing.T) {
+	ff := ffmpegPath(t)
 	for _, tc := range []struct {
-		name    string
-		src     []byte
-		ext     string
-		offsets []int64
-		lastMS  int64
+		name   string
+		src    []byte
+		ext    string
+		lastMS int64
 	}{
-		{"wav", pcm16(5500), "wav", []int64{0, 2000, 4000}, 1500},
-		{"wav remainder folded", pcm16(4500), "wav", []int64{0, 2000}, 2500},
-		{"m4a", fixture(t, "tone.m4a"), "m4a", []int64{0, 2000}, 1065},
-		{"mp3", fixture(t, "tone.mp3"), "mp3", []int64{0, 2000}, 1030},
+		{"wav", pcm16(5500), "wav", 3500},
+		{"m4a", fixture(t, "tone.m4a"), "m4a", 1065},
+		{"mp3", fixture(t, "tone.mp3"), "mp3", 1030},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_, d, err := probeBytes(tc.src)
-			if err != nil {
+			dir := t.TempDir()
+			in := filepath.Join(dir, "source."+tc.ext)
+			if err := os.WriteFile(in, tc.src, 0o600); err != nil {
 				t.Fatal(err)
 			}
-			chunks, err := c.Split(context.Background(), bytes.NewReader(tc.src), tc.ext, d)
-			if err != nil {
-				t.Fatal(err)
-			}
-			if len(chunks.Items) != len(tc.offsets) {
-				t.Fatalf("chunks = %d, want %d", len(chunks.Items), len(tc.offsets))
-			}
-			for k, ch := range chunks.Items {
-				if ch.OffsetMS != tc.offsets[k] {
-					t.Errorf("chunk %d offset %d, want %d", k, ch.OffsetMS, tc.offsets[k])
+			for k, want := range []int64{2000, tc.lastMS} {
+				out := filepath.Join(dir, fmt.Sprintf("piece_%d.m4a", k))
+				dur := int64(2000)
+				if k == 1 {
+					dur = 0
 				}
-				b, err := os.ReadFile(ch.Path)
+				if err := Extract(context.Background(), ff, in, out, int64(k)*2000, dur); err != nil {
+					t.Fatal(err)
+				}
+				b, err := os.ReadFile(out)
 				if err != nil {
 					t.Fatal(err)
 				}
 				ct, cd, err := probeBytes(b)
 				if err != nil {
-					t.Fatalf("chunk %d: %v", k, err)
-				}
-				want := int64(2000)
-				if k == len(chunks.Items)-1 {
-					want = tc.lastMS
+					t.Fatalf("piece %d: %v", k, err)
 				}
 				if ct != ChunkContentType || cd < want-150 || cd > want+150 {
-					t.Errorf("chunk %d: %s %d ms, want ~%d", k, ct, cd, want)
+					t.Errorf("piece %d: %s %d ms, want ~%d", k, ct, cd, want)
 				}
-			}
-			if err := chunks.Close(); err != nil {
-				t.Fatal(err)
-			}
-			if _, err := os.Stat(chunks.Dir); !os.IsNotExist(err) {
-				t.Fatalf("temp dir not removed: %v", err)
 			}
 		})
 	}
-}
-
-func TestChunkerSplitFailureCleansUp(t *testing.T) {
-	c := Chunker{FFmpegPath: ffmpegPath(t), ChunkSeconds: 2}
-	tmp := t.TempDir()
-	t.Setenv("TMPDIR", tmp)
-	if _, err := c.Split(context.Background(), bytes.NewReader([]byte("not audio at all")), "wav", 5000); err == nil {
-		t.Fatal("split of garbage succeeded")
-	}
-	if left, _ := os.ReadDir(tmp); len(left) != 0 {
-		t.Fatalf("temp dir left behind: %v", left)
-	}
-	if _, err := c.Split(context.Background(), bytes.NewReader(pcm16(3000)), "../x", 3000); err == nil {
-		t.Fatal("bad ext accepted")
+	if err := Extract(context.Background(), ff, filepath.Join(t.TempDir(), "missing.wav"), filepath.Join(t.TempDir(), "x.m4a"), 0, 0); err == nil {
+		t.Fatal("extract of a missing file succeeded")
 	}
 }

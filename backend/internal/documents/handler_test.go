@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"regexp"
+	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -57,7 +60,8 @@ func TestNotesJobSuccess(t *testing.T) {
 	var c AINotes
 	_ = json.Unmarshal(v.Revision.Content, &c)
 	if c.Language != "id" || len(c.Sections) != 1 || c.Sections[0].ID != "sec_1" || len(c.Sections[0].Items) != 3 ||
-		c.Sections[0].Items[0].Sources[0] != (SourceRef{Type: RefTranscript, SegmentID: "s1", StartMS: 0, EndMS: 4000}) {
+		c.Sections[0].Items[0].Sources[0] != (SourceRef{Type: RefTranscript, SegmentID: "s1", StartMS: 0, EndMS: 4000}) ||
+		slices.Contains(approxValues(v.Revision.Content), true) {
 		t.Fatalf("content %s", v.Revision.Content)
 	}
 	var provider, model, version string
@@ -72,7 +76,7 @@ func TestNotesJobSuccess(t *testing.T) {
 		t.Fatal("notes_ready event")
 	}
 	if e.count(t, `SELECT count(*) FROM ai_calls WHERE job_id = $1 AND capability = 'llm' AND outcome = 'ok'
-		AND prompt_version = 'notes-v1' AND input_tokens > 0 AND attempt = 1 AND job_type = 'generate_notes'`, jid) != 1 {
+		AND prompt_version = 'notes-v2' AND input_tokens > 0 AND attempt = 1 AND job_type = 'generate_notes'`, jid) != 1 {
 		t.Fatal("ai_calls row")
 	}
 	if e.count(t, `SELECT count(*) FROM search_documents WHERE meeting_id = $1 AND source = 'ai_notes' AND body LIKE '%sepakat%'`, mid) != 1 {
@@ -181,6 +185,9 @@ func TestPermanentFailures(t *testing.T) {
 	if e.count(t, `SELECT count(*) FROM document_revisions`) != 0 || e.count(t, `SELECT count(*) FROM ai_calls WHERE input_tokens IS NULL`) != 3 {
 		t.Fatal("nothing written; calls recorded")
 	}
+	if e.slot(t, j.ID) != "released" || e.remaining(t, u.ID) != e.cfg.AIGenerationLimit {
+		t.Fatal("permanent failure must release the slot and restore remaining")
+	}
 
 	e.mustPut(t, u.ID, mid, KindAINotes, putBody(0, -1, ids.New(), json.RawMessage(`{"schema_version":1,"language":"id","sections":[]}`)))
 	jm, _, err := e.generate(t, u.ID, mid, KindMoM, ids.New(), `{}`)
@@ -189,7 +196,7 @@ func TestPermanentFailures(t *testing.T) {
 	}
 	e.runAll(t)
 	if job = e.job(t, jm.ID); job.Status != jobs.StatusFailed || job.Attempts != 1 || *job.LastErrorCategory != jobs.CatProviderRejected ||
-		e.state(t, mid) != meetings.StateNotesFailed {
+		e.state(t, mid) != meetings.StateNotesFailed || e.slot(t, jm.ID) != "released" {
 		t.Fatalf("mom permanent %+v", job)
 	}
 
@@ -203,6 +210,10 @@ func TestPermanentFailures(t *testing.T) {
 	e.runAll(t)
 	if job = e.job(t, jn.ID); job.Status != jobs.StatusSucceeded || job.Attempts != 3 || e.state(t, mid) != meetings.StateNotesReady {
 		t.Fatalf("empty output retried %+v", job)
+	}
+	if e.slot(t, jn.ID) != "consumed" || e.remaining(t, u.ID) != e.cfg.AIGenerationLimit-1 ||
+		e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE job_id = $1`, jn.ID) != 1 {
+		t.Fatal("retries reuse one slot, consumed once")
 	}
 }
 
@@ -265,6 +276,10 @@ func TestFinalizeOnceUnderLeaseRerun(t *testing.T) {
 		e.job(t, g.ID).Status != jobs.StatusSucceeded {
 		t.Fatal("finalize must apply once")
 	}
+	if e.slot(t, g.ID) != "consumed" || e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, u.ID) != 1 ||
+		e.remaining(t, u.ID) != e.cfg.AIGenerationLimit-1 {
+		t.Fatal("lease-expiry rerun: one slot, consumed once")
+	}
 }
 
 func TestDeleteDuringGenerate(t *testing.T) {
@@ -289,5 +304,61 @@ func TestDeleteDuringGenerate(t *testing.T) {
 	if e.count(t, `SELECT count(*) FROM document_revisions`) != 0 || e.count(t, `SELECT count(*) FROM events`) != 0 ||
 		e.job(t, g.ID).Status != jobs.StatusCanceled {
 		t.Fatal("delete during job wrote data")
+	}
+	if e.slot(t, g.ID) != "released" || e.remaining(t, u.ID) != e.cfg.AIGenerationLimit {
+		t.Fatal("delete must release the slot")
+	}
+}
+
+var approxRe = regexp.MustCompile(`"approximate":\s*(true|false)`)
+
+func approxValues(content []byte) []bool {
+	var out []bool
+	for _, m := range approxRe.FindAllStringSubmatch(string(content), -1) {
+		out = append(out, m[1] == "true")
+	}
+	return out
+}
+
+func TestApproximateRefsFromTiming(t *testing.T) {
+	for _, tm := range []string{"chunk", "segment"} {
+		t.Run(tm, func(t *testing.T) {
+			e := newDEnv(t, nil, nil)
+			u := testutil.CreateUser(t, e.pool, 0)
+			mid, _ := e.seedMeetingTiming(t, u.ID, seedSegments, tm)
+			e.generateNotes(t, u.ID, mid)
+			e.generateMoM(t, u.ID, mid)
+			for _, kind := range []Kind{KindAINotes, KindMoM} {
+				v, err := e.svc.Get(bg, u.ID, mid, kind)
+				if err != nil {
+					t.Fatal(err)
+				}
+				if got := approxValues(v.Revision.Content); len(got) == 0 || slices.Contains(got, tm != "chunk") {
+					t.Fatalf("%s %s: %s", tm, kind, v.Revision.Content)
+				}
+			}
+			// A user edit re-resolves refs against the base revision's pins: the client's value is ignored.
+			v, _ := e.svc.Get(bg, u.ID, mid, KindAINotes)
+			forged := approxRe.ReplaceAllString(string(v.Revision.Content), `"approximate": `+strconv.FormatBool(tm != "chunk"))
+			saved := e.mustPut(t, u.ID, mid, KindAINotes, putBody(v.Revision.RevisionNumber, -1, ids.New(), json.RawMessage(forged)))
+			if got := approxValues(saved.Revision.Content); len(got) == 0 || slices.Contains(got, tm != "chunk") {
+				t.Fatalf("put: %s", saved.Revision.Content)
+			}
+		})
+	}
+}
+
+func TestPromptMarksUncertainSegments(t *testing.T) {
+	llm := &recordingLLM{}
+	e := newDEnv(t, llm, nil)
+	u := testutil.CreateUser(t, e.pool, 0)
+	segs := append([]segment(nil), seedSegments...)
+	segs[1].Uncertain = true
+	mid, _ := e.seedMeetingTiming(t, u.ID, segs, "chunk")
+	e.generateNotes(t, u.ID, mid)
+	msg := llm.user[0]
+	if !strings.Contains(msg, `{"id":"s2","start_ms":15000,"end_ms":19000,"text":"Kita sepakat rilis hari Jumat.","uncertain":true}`) ||
+		strings.Count(msg, `"uncertain"`) != 1 || !strings.Contains(llm.system[0], `"uncertain": true`) {
+		t.Fatal(msg)
 	}
 }

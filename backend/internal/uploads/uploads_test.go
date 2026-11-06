@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -127,6 +128,11 @@ func (e *env) state(mid string) string {
 
 func (e *env) updatedAt(mid string) time.Time {
 	return e.scalar(`SELECT updated_at FROM meetings WHERE id = $1`, mid).(time.Time)
+}
+
+func outcome(r *Result) string {
+	b, _ := json.Marshal(map[string]any{"job": r.Job, "transcription_blocked": r.TranscriptionBlocked})
+	return string(b)
 }
 
 func wantCode(t *testing.T, err error, code apperr.Code) *apperr.Error {
@@ -346,7 +352,7 @@ func TestAutoStart(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	j, created, err := e.svc.starter.StartInTx(e.ctx, tx, u.ID, mid, key, "auto")
+	j, created, err := e.svc.starter.StartInTx(e.ctx, tx, u.ID, mid, key, "auto", transcripts.NotesAuto)
 	_ = tx.Rollback(e.ctx)
 	if err != nil || created || j.ID != res.Job.ID {
 		t.Fatal("same key/body must replay the auto-started job", j, err)
@@ -357,17 +363,120 @@ func TestAutoStart(t *testing.T) {
 
 	broke := testutil.CreateUser(t, e.pool, 0)
 	mid2 := testutil.CreateMeeting(t, e.pool, broke.ID)
-	s2 := e.create(broke.ID, mid2, withAuto(input(b, "audio/wav", 5000), ids.New(), "id"))
+	key2 := ids.New()
+	s2 := e.create(broke.ID, mid2, withAuto(input(b, "audio/wav", 5000), key2, "id"))
 	res, err = e.upload(broke.ID, s2.ID, b)
 	if err != nil || res.Audio == nil || res.Job != nil || res.Upload.Status != "completed" {
 		t.Fatal("quota exhausted must still verify, with job null", res, err)
 	}
-	if e.state(mid2) != meetings.StateUploaded {
-		t.Fatal(e.state(mid2))
+	if e.state(mid2) != meetings.StateUploaded || res.TranscriptionBlocked != nil {
+		t.Fatal(e.state(mid2), res.TranscriptionBlocked)
 	}
 	if n := e.count(`SELECT count(*) FROM jobs WHERE meeting_id = $1`, mid2) +
 		e.count(`SELECT count(*) FROM quota_reservations WHERE meeting_id = $1`, mid2); n != 0 {
 		t.Fatal("no job or reservation", n)
+	}
+	first := outcome(res)
+	if _, err := e.pool.Exec(e.ctx, `UPDATE entitlements SET quota_seconds = 600 WHERE user_id = $1`, broke.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, created, err := e.svc.starter.(*transcripts.Service).Start(e.ctx, broke.ID, mid2, key2,
+		transcripts.StartInput{Language: ptr("id")}, []byte(`{"language":"id","notes":"auto"}`)); err != nil || !created {
+		t.Fatal(err, created)
+	}
+	if again, err := e.svc.Complete(e.ctx, broke.ID, s2.ID); err != nil || outcome(again) != first {
+		t.Fatal("replay must keep the first response's job null", outcome(again), err)
+	}
+}
+
+func TestAutoStartBlockedByGenerationLimit(t *testing.T) {
+	e := newEnv(t, func(c *config.Config) { c.AIGenerationLimit = 2 })
+	u := testutil.CreateUser(t, e.pool, 600)
+	if _, err := e.pool.Exec(e.ctx, `INSERT INTO ai_generation_slots (user_id, status, consumed_at, reserved_at)
+		VALUES ($1, 'consumed', now(), now() - interval '2 hours'), ($1, 'consumed', now(), now() - interval '1 hour')`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	b := testutil.WAV(5000)
+	mid := testutil.CreateMeeting(t, e.pool, u.ID)
+	s := e.create(u.ID, mid, withAuto(input(b, "audio/wav", 5000), ids.New(), "id"))
+	res, err := e.upload(u.ID, s.ID, b)
+	if err != nil || res.Audio == nil || res.Job != nil || res.Upload.Status != "completed" || res.TranscriptionBlocked == nil {
+		t.Fatal(res, err)
+	}
+	bl := res.TranscriptionBlocked
+	if bl.Code != apperr.AIGenerationLimit || bl.NextSlotAt == nil || time.Until(bl.NextSlotAt.Time) < 21*time.Hour+59*time.Minute {
+		t.Fatalf("%+v", bl)
+	}
+	if e.state(mid) != meetings.StateUploaded || e.count(`SELECT count(*) FROM jobs WHERE meeting_id = $1`, mid) != 0 ||
+		e.count(`SELECT count(*) FROM quota_reservations WHERE user_id = $1`, u.ID) != 0 ||
+		e.count(`SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, u.ID) != 2 {
+		t.Fatal("blocked auto-start reserved something")
+	}
+	first := outcome(res)
+
+	// The replay is read-only: it must not wait for the entitlement lock.
+	held, err := e.pool.Begin(e.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := held.Exec(e.ctx, `SELECT 1 FROM entitlements WHERE user_id = $1 FOR UPDATE`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	short, cancel := context.WithTimeout(e.ctx, 2*time.Second)
+	again, err := e.svc.Complete(short, u.ID, s.ID)
+	cancel()
+	_ = held.Rollback(e.ctx)
+	if err != nil || outcome(again) != first {
+		t.Fatal("replay must return the stored block without the entitlement lock", again, err)
+	}
+
+	// A slot frees, then the user transcribes only: the replay still reports the first response.
+	if _, err := e.pool.Exec(e.ctx, `UPDATE ai_generation_slots SET reserved_at = now() - interval '25 hours' WHERE user_id = $1`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if again, err = e.svc.Complete(e.ctx, u.ID, s.ID); err != nil || outcome(again) != first {
+		t.Fatal("replay after a slot freed must match the first response", outcome(again), first, err)
+	}
+	if _, created, err := e.svc.starter.(*transcripts.Service).Start(e.ctx, u.ID, mid, ids.New(),
+		transcripts.StartInput{Notes: ptr(transcripts.NotesSkip)}, []byte(`{"notes":"skip"}`)); err != nil || !created {
+		t.Fatal(err, created)
+	}
+	if again, err = e.svc.Complete(e.ctx, u.ID, s.ID); err != nil || outcome(again) != first {
+		t.Fatal("replay after transcribe-only must match the first response", outcome(again), first, err)
+	}
+
+	// Out of quota too: 402 comes before the slot check, so neither response nor replay may report ai_generation_limit.
+	broke := testutil.CreateUser(t, e.pool, 0)
+	if _, err := e.pool.Exec(e.ctx, `INSERT INTO ai_generation_slots (user_id, status, consumed_at, reserved_at)
+		VALUES ($1, 'consumed', now(), now()), ($1, 'consumed', now(), now())`, broke.ID); err != nil {
+		t.Fatal(err)
+	}
+	bmid := testutil.CreateMeeting(t, e.pool, broke.ID)
+	bs := e.create(broke.ID, bmid, withAuto(input(b, "audio/wav", 5000), ids.New(), "id"))
+	res, err = e.upload(broke.ID, bs.ID, b)
+	if err != nil || res.Job != nil || res.TranscriptionBlocked != nil {
+		t.Fatal("quota refusal is not a slot block", res, err)
+	}
+	if _, err := e.pool.Exec(e.ctx, `UPDATE entitlements SET quota_seconds = 600 WHERE user_id = $1`, broke.ID); err != nil {
+		t.Fatal(err)
+	}
+	again, err = e.svc.Complete(e.ctx, broke.ID, bs.ID)
+	if err != nil || outcome(again) != outcome(res) {
+		t.Fatal("replay must match the first response", outcome(again), err)
+	}
+
+	mid2 := testutil.CreateMeeting(t, e.pool, u.ID)
+	in := withAuto(input(b, "audio/wav", 5000), ids.New(), "id")
+	in.Transcription.Notes = ptr(transcripts.NotesSkip)
+	s2 := e.create(u.ID, mid2, in)
+	res, err = e.upload(u.ID, s2.ID, b)
+	if err != nil || res.Job == nil || res.TranscriptionBlocked != nil || e.state(mid2) != meetings.StateTranscribing {
+		t.Fatal(res, err)
+	}
+	if _, _, err := e.svc.Create(e.ctx, u.ID, testutil.CreateMeeting(t, e.pool, u.ID),
+		CreateInput{SizeBytes: ptr(int64(len(b))), SHA256: ptr(testutil.SHA256Hex(b)), ContentType: ptr("audio/wav"), DurationMS: ptr(int64(5000)),
+			Transcription: &TranscriptionInput{IdempotencyKey: ptr(ids.New()), Language: ptr("id"), Notes: ptr("never")}}); apperr.CodeOf(err) != apperr.ValidationFailed {
+		t.Fatal(err)
 	}
 }
 

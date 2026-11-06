@@ -84,7 +84,7 @@ struct MutationOutbox {
         if case .set(let language) = request.language {
             meeting.transcriptionLanguage = language
             for intent in store.intents(id) where intent.type == .transcribe {
-                intent.body = APICoding.encode(TranscriptionRequest(language: language))
+                intent.body = APICoding.encode(TranscriptionRequest(language: language, notes: IntentSender.notes(of: intent)))
                 if intent.keySent {
                     intent.idempotencyKey = UUID()
                     intent.keySent = false

@@ -27,7 +27,7 @@ SEGS = [
  ("Kita bahas lagi di rapat berikutnya setelah legal memberi masukan.", 43900, 51000),
  ("Terima kasih semua, rapat selesai.", 51000, 54000),
 ]
-def tref(i): s = SEGS[i]; return {"type": "transcript", "segment_id": f"s{i+1}", "start_ms": s[1], "end_ms": s[2]}
+def tref(i): s = SEGS[i]; return {"type": "transcript", "segment_id": f"s{i+1}", "start_ms": s[1], "end_ms": s[2], "approximate": True}
 
 def make_meeting(title, started, folder, tags, state, participants, duration=None, mom_review=None, docs=(), active=(), failed=None, src="recording"):
     mid = U()
@@ -63,8 +63,9 @@ def add_doc(rec, kind, content, origin="ai_generated", reviewed=False, stale=Fal
 def seed():
     r1 = make_meeting("Rapat anggaran Q4", at(-0, -6), F1["id"], [T1["id"], T2["id"]], "notes_ready", ["Budi", "Sari", "Rina"], duration=54000, mom_review="draft")
     m = r1["m"]
-    r1["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "created_at": at(-0, -5),
-                        "segments": [{"id": f"s{i+1}", "start_ms": s[1], "end_ms": s[2], "text": s[0]} for i, s in enumerate(SEGS)]}
+    r1["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "timing": "chunk", "created_at": at(-0, -5),
+                        "segments": [{"id": f"s{i+1}", "start_ms": s[1], "end_ms": s[2], "text": s[0], "uncertain": i in (1, 4),
+                                      "uncertain_reason": "low_confidence" if i in (1, 4) else None} for i, s in enumerate(SEGS)]}
     m["transcript"] = {"current_revision_id": r1["transcript"]["id"], "current_revision_number": 1}
     m["jobs"] = {"transcribe": job(m, "transcribe"), "generate_notes": job(m, "generate_notes"), "generate_mom": job(m, "generate_mom")}
     add_doc(r1, "manual_notes", {"schema_version": 1, "items": [
@@ -99,7 +100,7 @@ def seed():
               {"id": "it_f1", "text": "Bahas lagi setelah masukan legal.", "origin": "human", "edited": False, "sources": []}]}]})
     M.append(r1)
     r2 = make_meeting("Sinkronisasi tim produk", at(-1, -3), F2["id"], [T2["id"]], "generating_notes", ["Andi", "Sari"], duration=1830000)
-    r2["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "created_at": at(-1), "segments": [{"id": "s1", "start_ms": 0, "end_ms": 5000, "text": "Halo semua."}]}
+    r2["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "timing": "segment", "created_at": at(-1), "segments": [{"id": "s1", "start_ms": 0, "end_ms": 5000, "text": "Halo semua.", "uncertain": False, "uncertain_reason": None}]}
     r2["m"]["transcript"] = {"current_revision_id": r2["transcript"]["id"], "current_revision_number": 1}
     r2["m"]["jobs"]["transcribe"] = job(r2["m"], "transcribe"); r2["m"]["jobs"]["generate_notes"] = job(r2["m"], "generate_notes", "running")
     r2["active"] = ["generate_notes"]
@@ -108,7 +109,7 @@ def seed():
     r3["m"]["jobs"]["transcribe"] = job(r3["m"], "transcribe", "failed", "no_speech")
     M.append(r3)
     r4 = make_meeting("Retro sprint 42", at(-4), None, [], "notes_ready", [], duration=2400000, mom_review="reviewed")
-    r4["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "created_at": at(-4), "segments": [{"id": "s1", "start_ms": 0, "end_ms": 5000, "text": "Mulai retro."}]}
+    r4["transcript"] = {"id": U(), "revision_number": 1, "kind": "original", "language": "id", "timing": "segment", "created_at": at(-4), "segments": [{"id": "s1", "start_ms": 0, "end_ms": 5000, "text": "Mulai retro.", "uncertain": False, "uncertain_reason": None}]}
     r4["m"]["transcript"] = {"current_revision_id": r4["transcript"]["id"], "current_revision_number": 1}
     M.append(r4)
 seed()
@@ -126,7 +127,7 @@ def list_item(r):
 
 USAGE = {"entitlement": {"plan": "trial", "status": "active", "period_start": at(-10), "period_end": at(20), "quota_seconds": 7200},
          "consumed_seconds": 2520, "reserved_seconds": 0, "remaining_seconds": 4680,
-         "ai_generations": {"limit_per_day": 30, "used_last_24h": 3, "next_available_at": None}}
+         "ai_generations": {"limit": 30, "window_hours": 24, "used": 2, "reserved": 1, "remaining": 27, "next_slot_at": None}}
 CONFIG = {"max_audio_duration_ms": 7200000, "max_upload_bytes": 262144000, "upload_chunk_max_bytes": 33554432,
           "supported_content_types": ["audio/mp4", "audio/mpeg", "audio/wav"], "audio_retention_days": 30, "languages": ["id", "en"]}
 EXPORTS = {}
@@ -158,7 +159,11 @@ class H(BaseHTTPRequestHandler):
             print(method, p, flush=True)
             if p == "/healthz": return self.send(200, {"status": "ok"})
             if p == "/v1/config": return self.send(200, CONFIG)
-            if p == "/v1/auth/dev": return self.send(200, {"token": "phb_mock", "expires_at": at(30), "created": False, "user": USER})
+            if p in ("/v1/auth/dev", "/v1/auth/refresh"):
+                later = lambda **kw: ts(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(**kw))
+                pair = {"access_token": "mock_access", "access_token_expires_at": later(days=1), "refresh_token": "mock_refresh",
+                        "refresh_token_expires_at": later(days=180), "session_expires_at": later(days=180)}
+                return self.send(200, pair if p == "/v1/auth/refresh" else {"user": USER, **pair})
             if p == "/v1/auth/logout": return self.send(204)
             if p == "/v1/me":
                 if method == "PATCH": USER.update({k: v for k, v in b.items() if k in USER})

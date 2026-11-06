@@ -328,6 +328,11 @@ final class SyncEngine: SyncEngineAPI {
         let existing = store.intents(meetingID).first { $0.type == type }
         let intent: PendingIntent
         if let existing, existing.body == body {
+            // A 429 ai_generation_limit reserved nothing; retrying it is a new attempt with a new key.
+            if IntentSender.isBlockedByAILimit(existing) {
+                existing.idempotencyKey = UUID()
+                existing.keySent = false
+            }
             existing.lastErrorCode = nil
             intent = existing
         } else {
@@ -346,8 +351,8 @@ final class SyncEngine: SyncEngineAPI {
             env.app.poller.reset()
         case .rejected(let error):
             throw error
-        case .waiting(let code):
-            throw code == "entitlement_inactive" ? APIError.entitlementInactive(periodEnd: nil) : APIError.quotaExceeded(requiredSeconds: nil, remainingSeconds: nil)
+        case .waiting(let error):
+            throw error
         case .missing:
             await store.confirmMissing(meetingID, api: env.api, uploads: env.app.uploads)
             throw APIError.notFound

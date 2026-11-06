@@ -183,6 +183,12 @@ private struct AINotesCard: View {
             } else if document != nil {
                 ProgressView().frame(maxWidth: .infinity)
             }
+            if notesState == .notGenerated {
+                Label { Text(L("notes.notGenerated", table: .meetingDetail)) } icon: { Image(systemName: "note.text") }
+                    .font(Typography.callout)
+                    .foregroundStyle(Palette.textSecondary)
+                    .accessibilityElement(children: .combine)
+            }
             generateControls
         }
         .padding(Spacing.lg)

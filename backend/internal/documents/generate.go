@@ -12,6 +12,7 @@ import (
 	"phoebe/internal/ids"
 	"phoebe/internal/jobs"
 	"phoebe/internal/meetings"
+	"phoebe/internal/usage"
 )
 
 // Route patterns of the generate endpoints; part of the request fingerprint (backend.md §8).
@@ -164,7 +165,7 @@ func (s *Service) Generate(ctx context.Context, userID, meetingID string, kind K
 		} else if !errors.Is(err, pgx.ErrNoRows) {
 			return err
 		}
-		if err := s.usage.CheckAIRate(ctx, tx, userID); err != nil {
+		if err := s.usage.CheckSlot(ctx, tx, userID); err != nil {
 			return err
 		}
 		if in.Language != nil {
@@ -179,6 +180,9 @@ func (s *Service) Generate(ctx context.Context, userID, meetingID string, kind K
 			return s.duplicate(ctx, tx, userID, meetingID, key, fp, jobType, &out)
 		}
 		if err != nil {
+			return err
+		}
+		if err := usage.ReserveSlot(ctx, tx, usage.Slot{UserID: userID, MeetingID: meetingID, JobID: j.ID}); err != nil {
 			return err
 		}
 		if kind == KindAINotes {

@@ -6,3 +6,4 @@ build/
 /backend/bin/
 /backend/.data/
 .env
+/ios/Config/Local.xcconfig

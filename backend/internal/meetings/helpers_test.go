@@ -147,13 +147,13 @@ func (e *env) transcript(t *testing.T, uid, mid string, rev int, parent *string)
 	if rev == 1 {
 		j := e.job(t, uid, mid, jobs.TypeTranscribe)
 		e.finishJob(t, j.ID, jobs.StatusSucceeded, "")
-		e.exec(t, `INSERT INTO transcript_revisions (id, meeting_id, revision_number, kind, language, provider, model, segments, job_id)
-			VALUES ($1, $2, 1, 'original', 'id', 'fake', 'fake', '[]', $3)`, id, mid, j.ID)
+		e.exec(t, `INSERT INTO transcript_revisions (id, meeting_id, revision_number, kind, language, provider, model, segments, job_id, timing)
+			VALUES ($1, $2, 1, 'original', 'id', 'fake', 'fake', '[]', $3, 'chunk')`, id, mid, j.ID)
 		return id
 	}
 	e.exec(t, `INSERT INTO transcript_revisions (id, meeting_id, revision_number, kind, parent_revision_id, language, provider, model,
-		segments, mutation_id, mutation_fingerprint)
-		VALUES ($1, $2, $3, 'correction', $4, 'id', 'fake', 'fake', '[]', $5, $6)`, id, mid, rev, parent, ids.New(), strings.Repeat("e", 64))
+		segments, mutation_id, mutation_fingerprint, timing)
+		VALUES ($1, $2, $3, 'correction', $4, 'id', 'fake', 'fake', '[]', $5, $6, 'chunk')`, id, mid, rev, parent, ids.New(), strings.Repeat("e", 64))
 	return id
 }
 

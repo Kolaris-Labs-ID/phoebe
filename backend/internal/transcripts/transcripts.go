@@ -49,10 +49,12 @@ func New(pool *pgxpool.Pool, cfg *config.Config, store storage.Storage, us *usag
 }
 
 type Segment struct {
-	ID      string `json:"id"`
-	StartMS int64  `json:"start_ms"`
-	EndMS   int64  `json:"end_ms"`
-	Text    string `json:"text"`
+	ID              string  `json:"id"`
+	StartMS         int64   `json:"start_ms"`
+	EndMS           int64   `json:"end_ms"`
+	Text            string  `json:"text"`
+	Uncertain       bool    `json:"uncertain"`
+	UncertainReason *string `json:"uncertain_reason"`
 }
 
 type RevisionSummary struct {
@@ -60,6 +62,7 @@ type RevisionSummary struct {
 	RevisionNumber int        `json:"revision_number"`
 	Kind           string     `json:"kind"`
 	Language       string     `json:"language"`
+	Timing         string     `json:"timing"`
 	CreatedAt      jsonx.Time `json:"created_at"`
 }
 
@@ -75,13 +78,13 @@ type revisionRow struct {
 	mutationFingerprint *string
 }
 
-const revisionCols = `id, revision_number, kind, language, created_at, segments, audio_asset_id, provider, model, mutation_fingerprint`
+const revisionCols = `id, revision_number, kind, language, timing, created_at, segments, audio_asset_id, provider, model, mutation_fingerprint`
 
 func scanRevision(row pgx.Row) (*revisionRow, error) {
 	var r revisionRow
 	var created time.Time
 	var segs []byte
-	if err := row.Scan(&r.ID, &r.RevisionNumber, &r.Kind, &r.Language, &created, &segs, &r.audioAssetID,
+	if err := row.Scan(&r.ID, &r.RevisionNumber, &r.Kind, &r.Language, &r.Timing, &created, &segs, &r.audioAssetID,
 		&r.provider, &r.model, &r.mutationFingerprint); err != nil {
 		return nil, err
 	}
@@ -151,7 +154,7 @@ func (s *Service) ListRevisions(ctx context.Context, uid, mid string, limit int,
 	if after != nil {
 		before = &after.N
 	}
-	rows, err := s.pool.Query(ctx, `SELECT id, revision_number, kind, language, created_at FROM transcript_revisions
+	rows, err := s.pool.Query(ctx, `SELECT id, revision_number, kind, language, timing, created_at FROM transcript_revisions
 		WHERE meeting_id = $1 AND ($2::int IS NULL OR revision_number < $2)
 		ORDER BY revision_number DESC LIMIT $3`, mid, before, limit+1)
 	if err != nil {
@@ -162,7 +165,7 @@ func (s *Service) ListRevisions(ctx context.Context, uid, mid string, limit int,
 	for rows.Next() {
 		var r RevisionSummary
 		var created time.Time
-		if err := rows.Scan(&r.ID, &r.RevisionNumber, &r.Kind, &r.Language, &created); err != nil {
+		if err := rows.Scan(&r.ID, &r.RevisionNumber, &r.Kind, &r.Language, &r.Timing, &created); err != nil {
 			return nil, nil, err
 		}
 		r.CreatedAt = jsonx.NewTime(created)
@@ -184,9 +187,10 @@ type Edit struct {
 }
 
 type CorrectionInput struct {
-	ExpectedRevision *int    `json:"expected_revision"`
-	MutationID       *string `json:"mutation_id"`
-	Edits            []Edit  `json:"edits"`
+	ExpectedRevision            *int     `json:"expected_revision"`
+	MutationID                  *string  `json:"mutation_id"`
+	Edits                       []Edit   `json:"edits"`
+	ResolvedUncertainSegmentIDs []string `json:"resolved_uncertain_segment_ids"`
 }
 
 // Correct is POST /v1/meetings/{id}/transcript/revisions (backend.md §10). created=false on a
@@ -240,7 +244,7 @@ func (s *Service) Correct(ctx context.Context, uid, mid string, in CorrectionInp
 			return apperr.WithDetails(apperr.RevisionConflict, map[string]any{
 				"current_revision_number": cur.RevisionNumber, "current_revision_id": cur.ID})
 		}
-		segs, err := applyEdits(cur.Segments, in.Edits)
+		segs, err := applyEdits(cur.Segments, in.Edits, in.ResolvedUncertainSegmentIDs)
 		if err != nil {
 			return err
 		}
@@ -250,10 +254,10 @@ func (s *Service) Correct(ctx context.Context, uid, mid string, in CorrectionInp
 		}
 		r, err := scanRevision(tx.QueryRow(ctx, `
 			INSERT INTO transcript_revisions (meeting_id, revision_number, kind, parent_revision_id, audio_asset_id,
-			                                  language, provider, model, segments, mutation_id, mutation_fingerprint)
-			VALUES ($1, $2, 'correction', $3, $4, $5, $6, $7, $8, $9, $10)
+			                                  language, provider, model, segments, mutation_id, mutation_fingerprint, timing)
+			VALUES ($1, $2, 'correction', $3, $4, $5, $6, $7, $8, $9, $10, $11)
 			RETURNING `+revisionCols,
-			mid, cur.RevisionNumber+1, cur.ID, cur.audioAssetID, cur.Language, cur.provider, cur.model, b, mutationID, fp))
+			mid, cur.RevisionNumber+1, cur.ID, cur.audioAssetID, cur.Language, cur.provider, cur.model, b, mutationID, fp, cur.Timing))
 		if err != nil {
 			return err
 		}
@@ -272,8 +276,8 @@ func (s *Service) Correct(ctx context.Context, uid, mid string, in CorrectionInp
 	return out, created, nil
 }
 
-func applyEdits(cur []Segment, edits []Edit) ([]Segment, error) {
-	if len(edits) == 0 {
+func applyEdits(cur []Segment, edits []Edit, resolved []string) ([]Segment, error) {
+	if len(edits) == 0 && len(resolved) == 0 {
 		return nil, apperr.Content("/edits", apperr.ReasonTooShort)
 	}
 	idx := make(map[string]int, len(cur))
@@ -301,7 +305,22 @@ func applyEdits(cur []Segment, edits []Edit) ([]Segment, error) {
 		if utf8.RuneCountInString(*e.Text) > MaxSegmentText {
 			return nil, apperr.Content(p+"/text", apperr.ReasonTooLong)
 		}
-		out[k].Text = *e.Text
+		if out[k].Text != *e.Text {
+			out[k].Text, out[k].Uncertain, out[k].UncertainReason = *e.Text, false, nil
+		}
+	}
+	listed := map[string]bool{}
+	for i, id := range resolved {
+		p := fmt.Sprintf("/resolved_uncertain_segment_ids/%d", i)
+		k, ok := idx[id]
+		if !ok {
+			return nil, apperr.Content(p, apperr.ReasonNotFound)
+		}
+		if listed[id] {
+			return nil, apperr.Content(p, apperr.ReasonDuplicate)
+		}
+		listed[id] = true
+		out[k].Uncertain, out[k].UncertainReason = false, nil
 	}
 	return out, nil
 }

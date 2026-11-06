@@ -73,8 +73,8 @@ func seedTranscribedMeeting(t *testing.T, pool *pgxpool.Pool, uid string) string
 		uid, mid, ids.New()).Scan(&jid); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := pool.Exec(ctx, `INSERT INTO transcript_revisions (meeting_id, revision_number, kind, language, provider, model, segments, job_id)
-		VALUES ($1, 1, 'original', 'id', 'fake', 'fake-stt', '[{"id":"s1","start_ms":0,"end_ms":4000,"text":"Kita sepakat rilis Jumat."}]', $2)`,
+	if _, err := pool.Exec(ctx, `INSERT INTO transcript_revisions (meeting_id, revision_number, kind, language, provider, model, segments, job_id, timing)
+		VALUES ($1, 1, 'original', 'id', 'fake', 'fake-stt', '[{"id":"s1","start_ms":0,"end_ms":4000,"text":"Kita sepakat rilis Jumat."}]', $2, 'segment')`,
 		mid, jid); err != nil {
 		t.Fatal(err)
 	}

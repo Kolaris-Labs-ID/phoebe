@@ -112,7 +112,7 @@ func (w *world) drain() {
 }
 
 func (w *world) login(subject string) string {
-	return w.must(200, req{method: "POST", path: "/v1/auth/dev", body: `{"subject":"` + subject + `"}`})["token"].(string)
+	return w.must(200, req{method: "POST", path: "/v1/auth/dev", body: `{"subject":"` + subject + `"}`})["access_token"].(string)
 }
 
 func get(m map[string]any, path ...string) any {
@@ -294,18 +294,19 @@ func TestCrossAccountAllRoutes(t *testing.T) {
 		},
 	}
 	noForeignID := map[string]string{
-		"GET /healthz":         "public, no user data",
-		"GET /v1/config":       "public, no user data",
-		"POST /v1/auth/apple":  "sign-in, identity from the token only",
-		"POST /v1/auth/dev":    "sign-in, identity from the subject only",
-		"POST /v1/auth/logout": "acts on the caller's session",
-		"GET /v1/me":           "caller only",
-		"PATCH /v1/me":         "caller only",
-		"DELETE /v1/me":        "caller only",
-		"GET /v1/usage":        "caller only",
-		"GET /v1/folders":      "caller's list; leak checked below",
-		"GET /v1/tags":         "caller's list; leak checked below",
-		"POST /v1/events":      "foreign meeting_id stored as null; checked below",
+		"GET /healthz":          "public, no user data",
+		"GET /v1/config":        "public, no user data",
+		"POST /v1/auth/apple":   "sign-in, identity from the token only",
+		"POST /v1/auth/dev":     "sign-in, identity from the subject only",
+		"POST /v1/auth/logout":  "acts on the caller's session",
+		"POST /v1/auth/refresh": "identity from the refresh token only",
+		"GET /v1/me":            "caller only",
+		"PATCH /v1/me":          "caller only",
+		"DELETE /v1/me":         "caller only",
+		"GET /v1/usage":         "caller only",
+		"GET /v1/folders":       "caller's list; leak checked below",
+		"GET /v1/tags":          "caller's list; leak checked below",
+		"POST /v1/events":       "foreign meeting_id stored as null; checked below",
 	}
 	routes := w.api.Routes()
 	if len(routes) < 47 {
@@ -395,4 +396,101 @@ func TestPipelineThroughProductionWiring(t *testing.T) {
 	}
 	w.must(202, req{method: "DELETE", path: m, token: tok})
 	w.must(404, req{method: "GET", path: m, token: tok})
+}
+
+func TestAllowanceThroughProductionWiring(t *testing.T) {
+	w := newWorld(t)
+	tok := w.login("dora")
+	wav := testutil.WAV(60_000)
+	half := len(wav) / 2
+	upload := func(mid, key string) map[string]any {
+		up := get(w.must(201, req{method: "POST", path: "/v1/meetings/" + mid + "/uploads", token: tok,
+			body: `{"size_bytes":` + strconv.Itoa(len(wav)) + `,"sha256":"` + testutil.SHA256Hex(wav) +
+				`","content_type":"audio/wav","duration_ms":60000,"transcription":{"idempotency_key":"` + key + `","language":"id"}}`}),
+			"upload", "id").(string)
+		w.must(200, req{method: "PUT", path: "/v1/uploads/" + up, token: tok, offset: "0", raw: wav[:half]})
+		return w.must(200, req{method: "PUT", path: "/v1/uploads/" + up, token: tok, offset: strconv.Itoa(half), raw: wav[half:]})
+	}
+	meeting := func() string {
+		return get(w.must(201, req{method: "POST", path: "/v1/meetings", token: tok, body: `{"timezone":"Asia/Jakarta"}`}), "meeting", "id").(string)
+	}
+	var uid string
+	if err := w.pool.QueryRow(ctx, `SELECT id FROM users WHERE dev_sub = 'dora'`).Scan(&uid); err != nil {
+		t.Fatal(err)
+	}
+	aiGen := func() map[string]any {
+		return w.must(200, req{method: "GET", path: "/v1/usage", token: tok})["ai_generations"].(map[string]any)
+	}
+
+	m1 := meeting()
+	if last := upload(m1, ids.New()); last["job"] == nil || last["transcription_blocked"] != nil {
+		t.Fatal(last)
+	}
+	if g := aiGen(); g["reserved"] != 1.0 || g["remaining"] != 29.0 {
+		t.Fatal("auto notes slot reserved at upload", g)
+	}
+	if _, err := w.pool.Exec(ctx, `INSERT INTO ai_generation_slots (user_id, status, consumed_at) SELECT $1, 'consumed', now() FROM generate_series(1, 29)`, uid); err != nil {
+		t.Fatal(err)
+	}
+	w.drain()
+	if get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m1, token: tok}), "meeting", "pipeline_state") != "notes_ready" {
+		t.Fatal("reserved auto notes must finish at the limit")
+	}
+	g := aiGen()
+	if g["limit"] != 30.0 || g["window_hours"] != 24.0 || g["used"] != 30.0 || g["reserved"] != 0.0 || g["remaining"] != 0.0 || g["next_slot_at"] == nil {
+		t.Fatal(g)
+	}
+	tr := get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m1 + "/transcript", token: tok}), "revision").(map[string]any)
+	if tr["timing"] != "chunk" || tr["segments"].([]any)[0].(map[string]any)["uncertain"] != false {
+		t.Fatal(tr)
+	}
+	notes := get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m1 + "/documents/ai_notes", token: tok}), "revision").(map[string]any)
+	nb, _ := json.Marshal(notes["content"])
+	if !strings.Contains(string(nb), `"approximate":true`) || strings.Contains(string(nb), `"approximate":false`) {
+		t.Fatal(string(nb))
+	}
+	ex := w.must(201, req{method: "POST", path: "/v1/exports", token: tok, body: `{"document_revision_id":"` + notes["id"].(string) + `","format":"md"}`})
+	if txt, _ := ex["text"].(string); !strings.Contains(txt, `[\~00:00]`) || !strings.Contains(txt, `\~ = perkiraan waktu`) {
+		t.Fatal(txt)
+	}
+
+	m2 := meeting()
+	key := ids.New()
+	last := upload(m2, key)
+	if last["job"] != nil || get(last, "transcription_blocked", "code") != "ai_generation_limit" || get(last, "transcription_blocked", "next_slot_at") == nil ||
+		get(last, "upload", "status") != "completed" {
+		t.Fatal(last)
+	}
+	st, body := w.do(req{method: "POST", path: "/v1/meetings/" + m2 + "/transcription", token: tok, key: key, body: `{"language":"id","notes":"auto"}`})
+	if st != 429 || errCode(body) != "ai_generation_limit" || get(body, "error", "details", "remaining") != 0.0 || get(body, "error", "details", "limit") != 30.0 {
+		t.Fatal(st, body)
+	}
+	u := w.must(200, req{method: "GET", path: "/v1/usage", token: tok})
+	if u["reserved_seconds"] != 0.0 || get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m2, token: tok}), "meeting", "pipeline_state") != "uploaded" {
+		t.Fatal("blocked start reserved quota", u)
+	}
+	// Transcribe only: a new intent with a new key.
+	w.must(202, req{method: "POST", path: "/v1/meetings/" + m2 + "/transcription", token: tok, key: ids.New(), body: `{"language":"id","notes":"skip"}`})
+	w.drain()
+	if get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m2, token: tok}), "meeting", "pipeline_state") != "transcript_ready" {
+		t.Fatal("skip → transcript_ready")
+	}
+	if st, body := w.do(req{method: "POST", path: "/v1/meetings/" + m2 + "/documents/ai_notes/generate", token: tok, key: ids.New(), body: `{}`}); st != 429 || errCode(body) != "ai_generation_limit" {
+		t.Fatal(st, body)
+	}
+
+	if _, err := w.pool.Exec(ctx, `UPDATE ai_generation_slots SET reserved_at = reserved_at - interval '25 hours' WHERE user_id = $1`, uid); err != nil {
+		t.Fatal(err)
+	}
+	if g := aiGen(); g["remaining"] != 30.0 || g["next_slot_at"] != nil {
+		t.Fatal(g)
+	}
+	w.must(202, req{method: "POST", path: "/v1/meetings/" + m2 + "/documents/ai_notes/generate", token: tok, key: ids.New(), body: `{}`})
+	w.drain()
+	if get(w.must(200, req{method: "GET", path: "/v1/meetings/" + m2, token: tok}), "meeting", "pipeline_state") != "notes_ready" {
+		t.Fatal("transcript_ready → notes_ready")
+	}
+	if g := aiGen(); g["used"] != 1.0 || g["remaining"] != 29.0 {
+		t.Fatal(g)
+	}
 }

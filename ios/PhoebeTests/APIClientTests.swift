@@ -72,7 +72,7 @@ struct APIClientTests {
         return APIClient(
             baseURL: URL(string: "http://localhost:8080")!,
             session: URLSession(configuration: config),
-            tokenProvider: { "phb_test" },
+            tokens: MemoryTokenStore(.pair("phb_test", expiresIn: 900)),
             onUnauthenticated: { flag.value = true }
         )
     }
@@ -91,7 +91,7 @@ struct APIClientTests {
     @Test func snakeCaseRoundTripOfSegmentAndNoteIds() throws {
         let refs: [SourceRef] = [.transcript(segmentId: "s42", startMs: 734000, endMs: 741500), .userNotes(noteId: "n3")]
         let json = Fixtures.string(try APICoding.encoder().encode(refs))
-        #expect(json == "[{\"end_ms\":741500,\"segment_id\":\"s42\",\"start_ms\":734000,\"type\":\"transcript\"},{\"note_id\":\"n3\",\"type\":\"user_notes\"}]")
+        #expect(json == "[{\"approximate\":false,\"end_ms\":741500,\"segment_id\":\"s42\",\"start_ms\":734000,\"type\":\"transcript\"},{\"note_id\":\"n3\",\"type\":\"user_notes\"}]")
         #expect(try APICoding.decoder().decode([SourceRef].self, from: Data(json.utf8)) == refs)
 
         let segment = try APICoding.decoder().decode(TranscriptSegment.self, from: Data("{\"id\":\"s1\",\"start_ms\":0,\"end_ms\":4200,\"text\":\"Halo\"}".utf8))
@@ -130,6 +130,23 @@ struct APIClientTests {
         StubURLProtocol.reset([StubResponse(status: 401, body: Self.envelope("unauthenticated"))])
         await #expect(throws: APIError.unauthenticated) { try await makeClient().send(Endpoints.me()) }
         #expect(unauthenticated.value)
+    }
+
+    @Test func sessionRevokedAndExpiredSignOut() async {
+        StubURLProtocol.reset([
+            StubResponse(status: 401, body: Self.envelope("session_revoked")),
+            StubResponse(status: 401, body: Self.envelope("session_expired")),
+        ])
+        let client = makeClient()
+        await #expect(throws: APIError.unauthenticated) { try await client.send(Endpoints.me()) }
+        await #expect(throws: APIError.unauthenticated) { try await client.send(Endpoints.usage()) }
+        #expect(unauthenticated.value)
+    }
+
+    @Test func accessTokenExpiredMapsToItsOwnCode() {
+        let error = APIError.from(status: 401, data: Data(Self.envelope("access_token_expired").utf8))
+        #expect(error == .accessTokenExpired)
+        #expect(error.code == "access_token_expired")
     }
 
     @Test func paymentRequiredCodes() async {
@@ -171,7 +188,7 @@ struct APIClientTests {
             StubResponse(status: 410, body: Self.envelope("audio_unavailable")),
             StubResponse(status: 422, body: Self.envelope("validation_failed", "{\"fields\":[{\"field\":\"folder_id\",\"reason\":\"not_found\"}]}")),
             StubResponse(status: 422, body: Self.envelope("invalid_content", "{\"path\":\"/sections/0/items/1/text\",\"reason\":\"required\"}")),
-            StubResponse(status: 429, body: Self.envelope("rate_limited", "{\"retry_after_seconds\":120}"), headers: ["Retry-After": "120"]),
+            StubResponse(status: 429, body: Self.envelope("ai_generation_limit", "{\"limit\":30,\"remaining\":0,\"next_slot_at\":\"2026-11-06T04:00:00.000Z\"}"), headers: ["Retry-After": "120"]),
         ])
         let client = makeClient()
         let id = UUID()
@@ -183,7 +200,7 @@ struct APIClientTests {
         await #expect(throws: APIError.invalidContent(path: "/sections/0/items/1/text", reason: "required")) {
             try await client.send(Endpoints.putDocument(meetingID: id, kind: .aiNotes, expectedRevision: 1, baseRevision: 1, mutationID: UUID(), content: Data("{}".utf8)))
         }
-        await #expect(throws: APIError.rateLimited(retryAfterSeconds: 120)) {
+        await #expect(throws: APIError.aiGenerationLimit(nextSlotAt: APICoding.parseDate("2026-11-06T04:00:00.000Z"))) {
             try await client.send(Endpoints.generateNotes(meetingID: id, idempotencyKey: UUID(), body: APICoding.encode(GenerateNotesRequest(language: nil))))
         }
         #expect(!unauthenticated.value)
@@ -221,7 +238,7 @@ struct APIClientTests {
     @Test func idempotencyKeyAndBodyIdenticalAcrossRetries() async throws {
         let meetingID = UUID()
         let intent = PendingIntent.transcribe(meetingID: meetingID, language: .id)
-        #expect(Fixtures.string(intent.body) == "{\"language\":\"id\"}")
+        #expect(Fixtures.string(intent.body) == "{\"language\":\"id\",\"notes\":\"auto\"}")
         StubURLProtocol.reset([
             StubResponse(status: 503, body: Self.envelope("unavailable")),
             StubResponse(status: 0, body: "", error: URLError(.networkConnectionLost)),

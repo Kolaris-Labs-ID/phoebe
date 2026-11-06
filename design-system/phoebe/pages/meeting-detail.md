@@ -38,7 +38,7 @@ Three steps, each `Label` (icon + text) with state word underneath; never color 
 | Transkrip | `text.quote` "Menunggu" | `waveform` + ProgressView "Memproses" | `checkmark.circle` "Siap" | `exclamationmark.triangle` "Gagal" |
 | Notes | `note.text` "Menunggu" | `sparkles` + ProgressView "Memproses" | `checkmark.circle` "Siap" | `exclamationmark.triangle` "Gagal" |
 
-Waiting-for-connection, waiting-for-quota and plan-ended replace "Menunggu" with `wifi.slash` "Menunggu koneksi" / `gauge.with.dots.needle.100percent` "Menunggu kuota" / `calendar.badge.exclamationmark` "Paket berakhir".
+Waiting-for-connection, waiting-for-quota and plan-ended replace "Menunggu" with `wifi.slash` "Menunggu koneksi" / `gauge.with.dots.needle.100percent` "Menunggu kuota" / `calendar.badge.exclamationmark` "Paket berakhir". A transcription held for an AI slot (C2) shows `hourglass` "Menunggu slot AI" on Transkrip (warning). After "Transkrip saja" (`pipeline_state` `transcript_ready`) Notes shows `note.text` "Belum dibuat" (textSecondary), not "Menunggu".
 
 ### Transcript tab
 ```
@@ -47,12 +47,25 @@ Waiting-for-connection, waiting-for-quota and plan-ended replace "Menunggu" with
  12:15  Siapa yang pegang vendor?
         pencil "Dikoreksi"                 ← correction marker (icon+text) on edited segments
 ```
+Chunk timing (C1, `timing: "chunk"`): every time renders `~mm:ss` (`~h:mm:ss` ≥ 1 h), VoiceOver "sekitar 12 menit, 4 detik" / "about 12 minutes, 4 seconds", and an `info.circle` footnote `transcript.timing.chunk` sits above the rows. Never imply word-level timestamps. `timing: "segment"` renders plain `mm:ss`.
+
+Uncertain segments (C1, `uncertain: true`): the row adds `exclamationmark.bubble` + "Perlu ditinjau" (caption semibold, warning; icon + text, never color alone). Above the rows a review card shows `exclamationmark.bubble` "Perlu ditinjau: 3", previous / next buttons (`chevron.up` / `chevron.down`, 44 pt, labeled "Bagian sebelumnya/berikutnya untuk ditinjau") that scroll to the segment, outline it (2 pt warning border) and move VoiceOver focus to it, wrapping around; and a Toggle "Tampilkan hanya yang perlu ditinjau". Hidden while "Lihat versi asli" is on and when no segment is uncertain. The card stacks vertically at accessibility text sizes.
+
+```
+ ⓘ Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik).
+ ┌ 💬 Perlu ditinjau: 2          ⌃  ⌄ ┐
+ │ Tampilkan hanya yang perlu ditinjau ◯ │
+ └──────────────────────────────────────┘
+ ~00:30  Budget lima puluh juta.
+         💬 Perlu ditinjau
+```
+
 `List(.plain)` lazy rows. Tap timestamp → seek + play. Currently playing segment: `accentSoft` background + `speaker.wave.2` icon + VoiceOver value "sedang diputar". Long-press / context menu → "Koreksi teks" (edit sheet) / "Salin". Offline: "Koreksi teks" disabled with footnote `transcript.edit.offline` (corrections are online-only; no outbox). Toolbar on tab: "Lihat versi asli" toggle when corrections exist.
 
 ### Notes tab
 Two cards, stacked:
 1. **Catatan Anda** (manual notes) — `person.fill`; a list of short points (api §3.1 items; points typed during recording show their `[mm:ss]` offset as a tappable ref). Each point is an inline `TextField(axis: .vertical)`; a typed Return (`"\n"` detected in `onChange`) splits the point and focuses the new one; delete via swipe / context menu Hapus or the keyboard-toolbar `trash` button ("Hapus poin"); "Tambah poin" row at the end. Empty points stay in the local draft and are not synced. Autosave ≤2 s, save indicator. Editable offline, even if AI fails or quota is exhausted. Point ids stay stable across edits. A `409` (another device, or a lost-response replay) opens the same ConflictSheet as the MoM editor (`mom-editor.md`), driven by `PendingDocumentEdit.conflictCurrentRevision`.
-2. **Notes AI** — `sparkles` "AI"; structured read view of AI notes (sections + bullets with source refs). Editable via "Edit" → same item editor as MoM (`mom-editor.md`), creates a revision. Version menu (`clock.arrow.circlepath`) lists AI notes versions; "Buat ulang" (regenerate) creates a new version.
+2. **Notes AI** — `sparkles` "AI"; structured read view of AI notes (sections + bullets with source refs; refs flagged `approximate` render `~mm:ss`, see "Source reference"). With `transcript_ready` (transcription only) or `notes_failed` and no AI notes: `note.text` line `notes.notGenerated` (transcript_ready only) and Secondary "Buat catatan" (`notes.generate`, `POST …/ai_notes/generate`, reserves one AI generation). With 0 AI generations left it is disabled and the footnote reads the allowance: "30 generasi AI per 24 jam · Sisa 0. Slot berikutnya tersedia 14.30 (dalam 2 jam)." A `429 ai_generation_limit` on tap refreshes `/v1/usage` and shows the same footnote. Editable via "Edit" → same item editor as MoM (`mom-editor.md`), creates a revision. Version menu (`clock.arrow.circlepath`) lists AI notes versions; "Buat ulang" (regenerate) creates a new version.
 
 ### MoM tab
 - No MoM yet: `ContentUnavailableView` `doc.text`, title `mom.none.title`, body, Primary "Buat MoM" (enabled when an AI notes revision exists — api `ai_notes_not_ready` otherwise), plus source picker "Dari notes versi: v2 (terbaru)" (Menu, sends `ai_notes_revision_id`). Secondary "Tulis MoM manual" creates the empty MoM template (`PUT …/documents/mom` with `expected_revision: 0`) — always available, so a MoM can be written when AI fails or quota is exhausted (PRD DOC-03 acceptance).
@@ -81,7 +94,11 @@ Two cards, stacked:
 | Notes AI | generating | card ProgressView `detail.notes.generating`; transcript fully readable | — |
 | Notes AI | failed | card danger banner `detail.notes.failed` + per-category line (table below); manual notes still editable | per table |
 | Notes AI | based on earlier version (transcript corrected after generation) | warning chip + banner `doc.outdated.*` on the AI notes card; content still shown; not auto-replaced | Buat ulang (new version) / Tutup |
-| Notes AI | regenerate rate limited | Buat ulang disabled + footnote `doc.regen.limited` with `/v1/usage.ai_generations.next_available_at` (known before tapping) or `retry_after_seconds` from a 429 | — |
+| Notes AI / MoM | AI generations used up (C2, `remaining` 0) | Buat catatan / Buat ulang / Buat MoM / Coba lagi disabled + footnote (`ActionErrorText` key `ai.limit.reached`): "30 generasi AI per 24 jam · Sisa 0. Slot berikutnya tersedia <time>." from `/v1/usage.ai_generations`; a `429 ai_generation_limit` refreshes usage and shows the same | wait for the slot |
+| Notes AI | transcription only (`transcript_ready`) | strip Notes "Belum dibuat"; card shows `notes.notGenerated` + "Buat catatan" | Buat catatan (reserves a slot) |
+| Transcription | waiting for an AI slot (transcribe intent got `429 ai_generation_limit`, or upload completion `transcription_blocked`; nothing reserved) | strip Transkrip `hourglass` "Menunggu slot AI"; warning banner `ai.slot.banner.title` + `ai.slot.banner.body` + next slot time. The choice sheet opens by itself when the block arrives while the screen is open | 0 left: "Pilih cara lanjut" (choice sheet). Slot free again: "Mulai transkripsi" (with notes, new key) |
+| Transcript | chunk timing | `~mm:ss` times + `transcript.timing.chunk` footnote | — |
+| Transcript | uncertain segments | row marker "Perlu ditinjau", review card with count, previous/next, filter | Koreksi teks → confirm or fix |
 | Notes AI / MoM | unsynced manual-notes (or AI-notes) edits, offline or in conflict | Buat ulang / Buat MoM / Coba lagi disabled + footnote `doc.regen.syncFirst` | resolve sync |
 | MoM | none / generating / ready / failed | see MoM tab | — |
 | MoM | based on earlier version (notes or transcript changed) | warning chip on MoM card `doc.outdated.*` | Buat ulang / Buka tetap |
@@ -119,7 +136,27 @@ Edit info (title, date, time zone, participants) · Pindahkan ke folder · Atur 
 Metadata conflict (`409 metadata_conflict`, metadata changed on another device): sheet `arrow.triangle.branch` `meta.conflict.title` / `meta.conflict.body`, showing server values; Primary `meta.conflict.keepMine` (re-PATCH my changed fields on top of the latest), Destructive `meta.conflict.useLatest` (confirm). Never applied silently.
 
 ## Transcript correction sheet
-TextEditor prefilled with segment text; footnote `transcript.edit.footnote` (original kept, notes/MoM will be marked as based on earlier version). Save (online only) → `POST …/transcript/revisions {expected_revision, mutation_id, edits: [{segment_id, text}]}`; a timeout is retried with the same `mutation_id` and edits; 409 → refetch and reapply the edit to the latest text after the user confirms.
+TextEditor prefilled with segment text; header is the (approximate) time; footnote `transcript.edit.footnote` (original kept, notes/MoM will be marked as based on earlier version). Save (online only) → `POST …/transcript/revisions {expected_revision, mutation_id, edits: [{segment_id, text}], resolved_uncertain_segment_ids}`; a timeout is retried with the same `mutation_id` and edits; 409 → refetch and reapply the edit to the latest text after the user confirms.
+
+Uncertain segment: an extra section `exclamationmark.bubble` "Perlu ditinjau" + `transcript.review.body`. Save is enabled even with unchanged text, and while the text is unchanged the section offers "Teks sudah benar, tandai sudah ditinjau" (`transcript.review.confirm`). Either sends the segment in `edits` (same or new text) and in `resolved_uncertain_segment_ids`, so the new revision has `uncertain: false`.
+
+## AI slot choice sheet (C2)
+Shown before any transcription minutes are reserved when transcription would include automatic notes and no AI generation is left: on "Coba lagi" / "Mulai transkripsi" when `/v1/usage` (refreshed first) shows `remaining` 0, on `429 ai_generation_limit`, and when a blocked transcription arrives while Meeting Detail is open (upload completion `transcription_blocked`). Never auto-picked; both options are equal Secondary buttons; dismissing (swipe or "Tutup") = wait.
+
+```
+ Slot AI belum tersedia                      (title, header)
+ ┌ ✦ 30 generasi AI per 24 jam · Sisa 0.    ┐
+ │   Slot berikutnya tersedia 14.30 (dalam 2 jam). │
+ └─────────────────────────────────────────┘
+ Transkripsi belum dimulai, jadi menit transkripsi belum terpakai. Pilih cara melanjutkan.
+ ┌ ai.choice.wait.body                      ┐
+ │ [ ⌛ Tunggu slot AI ]                     │ → dismiss; meeting stays uploaded, banner shows next slot
+ └──────────────────────────────────────────┘
+ ┌ ai.choice.transcribeOnly.minutes (≈ N min)┐
+ │ [ ❝ Transkrip saja ]                      │ → new intent, new key, body {"language", "notes": "skip"}
+ └──────────────────────────────────────────┘
+```
+After "Transkrip saja" the transcript arrives with `pipeline_state` `transcript_ready`; notes can be generated later from the Notes tab. Detents `.medium`/`.large`; at accessibility text sizes `.large` only, so both options stay reachable without dragging. Screens: `ios/screenshots/{light,dark,xl}-13-ai-slot-choice.png`, `-14-ai-slot-waiting`, `-15-transcript-only`.
 
 ## Copy
 
@@ -174,7 +211,32 @@ TextEditor prefilled with segment text; footnote `transcript.edit.footnote` (ori
 | detail.notes.edit | Edit | Edit |
 | doc.regen | Buat ulang | Regenerate |
 | doc.regen.footnote | Membuat versi baru. Versi sebelumnya dan hasil edit Anda tetap tersimpan. | Creates a new version. Earlier versions and your edits are kept. |
-| doc.regen.limited | Batas pembuatan ulang tercapai. Coba lagi %@. | Regenerate limit reached. Try again %@. |
+| ai.limit.reached | Batas generasi AI tercapai. | AI generation limit reached. |
+| notes.generate | Buat catatan | Generate notes |
+| notes.notGenerated | Catatan AI belum dibuat karena Anda memilih transkrip saja. Anda bisa membuatnya dari transkrip. | AI notes weren't created because you chose transcription only. You can create them from the transcript. |
+| step.waitingAISlot | Menunggu slot AI | Waiting for AI slot |
+| step.notGenerated | Belum dibuat | Not created |
+| transcript.timing.chunk | Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik). | Times are approximate, per recording section (about 30 seconds). |
+| transcript.uncertain | Perlu ditinjau | Needs review |
+| transcript.review.count | Perlu ditinjau: %lld | Needs review: %lld |
+| transcript.review.previous | Bagian sebelumnya untuk ditinjau | Previous section to review |
+| transcript.review.next | Bagian berikutnya untuk ditinjau | Next section to review |
+| transcript.review.filter | Tampilkan hanya yang perlu ditinjau | Show only sections that need review |
+| transcript.review.body | Bagian ini mungkin tidak terdengar jelas. Dengarkan audionya, perbaiki teks bila perlu, lalu simpan untuk menandainya sudah ditinjau. | This part may not have been heard clearly. Listen to the audio, correct the text if needed, then save to mark it as reviewed. |
+| transcript.review.confirm | Teks sudah benar, tandai sudah ditinjau | Text is correct, mark as reviewed |
+| ai.slot.banner.title | Transkripsi menunggu slot AI | Transcription is waiting for an AI slot |
+| ai.slot.banner.body | Transkripsi belum dimulai dan menit belum terpakai. | Transcription hasn't started and no minutes were used. |
+| ai.slot.banner.available | Slot AI tersedia lagi. Mulai transkripsi dengan catatan AI. | An AI slot is available again. Start transcription with AI notes. |
+| ai.slot.banner.start | Mulai transkripsi | Start transcription |
+| ai.slot.banner.choose | Pilih cara lanjut | Choose how to continue |
+| ai.choice.title | Slot AI belum tersedia | No AI slot available |
+| ai.choice.body | Transkripsi belum dimulai, jadi menit transkripsi belum terpakai. Pilih cara melanjutkan. | Transcription hasn't started, so no transcription minutes have been used. Choose how to continue. |
+| ai.choice.wait | Tunggu slot AI | Wait for AI slot |
+| ai.choice.wait.body | Rekaman tetap tersimpan dan belum ditranskripsi. Mulai lagi saat slot tersedia; transkrip dan catatan AI lalu dibuat bersama. | The recording stays saved and isn't transcribed yet. Start again when a slot is available; the transcript and AI notes are then created together. |
+| ai.choice.transcribeOnly | Transkrip saja | Transcribe only |
+| ai.choice.transcribeOnly.body | Transkripsi dimulai sekarang dan memakai menit transkripsi. Catatan AI bisa dibuat nanti dari transkrip. | Transcription starts now and uses transcription minutes. You can create AI notes later from the transcript. |
+| ai.choice.transcribeOnly.minutes | Transkripsi dimulai sekarang dan memakai sekitar %lld menit transkripsi. Catatan AI bisa dibuat nanti dari transkrip. | Transcription starts now and uses about %lld transcription minutes. You can create AI notes later from the transcript. |
+| time.approximate.a11y (Common) | sekitar %@ | about %@ |
 | doc.outdated.chip | Berdasarkan versi lama | Based on earlier version |
 | doc.outdated.body | Sumbernya sudah berubah sejak versi ini dibuat. Isinya tidak diganti otomatis. | Its source changed after this version was created. It isn't replaced automatically. |
 | doc.outdated.reason.transcript | Transkrip sudah dikoreksi. | The transcript was corrected. |
@@ -239,7 +301,7 @@ TextEditor prefilled with segment text; footnote `transcript.edit.footnote` (ori
 - Title is header trait; focus lands on it after push.
 - Pipeline strip: one element per step, label "Upload: selesai", "Transkrip: memproses", "Notes: gagal" (step + state word).
 - Player: play button label toggles Putar/Jeda; slider `accessibilityValue` "12 menit 4 detik dari 42 menit 10 detik"; adjustable action steps 15 s.
-- Transcript row: label "<spoken timestamp>, <text>", action "Putar dari 12:04" as default activation; custom actions Koreksi, Salin. Disabled playback → row is static text only.
+- Transcript row: label "<spoken timestamp>, <text>", action "Putar dari 12:04" as default activation; custom actions Koreksi, Salin. Disabled playback → row is static text only. Chunk timing: spoken timestamp is "sekitar 12 menit, 4 detik" (also in the play hint and source-reference labels "Putar dari sekitar …"). Uncertain rows append ", Perlu ditinjau".
 - Origin and outdated markers are text, read in-line ("AI", "Berdasarkan versi lama").
 - Segmented control: system accessibility; tab content change moves VoiceOver focus to first element of the tab.
 - Banners announced on appear; failures use `.accessibilityAddTraits(.isStaticText)` with action button separate.

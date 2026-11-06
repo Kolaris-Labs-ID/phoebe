@@ -15,6 +15,9 @@ targets:
     type: application
     platform: iOS
     sources: [Phoebe]
+    configFiles:
+      Debug: Config/Signing.xcconfig
+      Release: Config/Signing.xcconfig
     entitlements:
       path: Phoebe/Phoebe.entitlements
       properties:

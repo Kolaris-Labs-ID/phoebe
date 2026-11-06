@@ -3,11 +3,14 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"phoebe/internal/apperr"
 	"phoebe/internal/db"
+	"phoebe/internal/jsonx"
 	"phoebe/internal/obs"
 )
 
@@ -21,6 +24,9 @@ var codeTable = map[apperr.Code]codeInfo{
 	apperr.InvalidJSON:           {http.StatusBadRequest, "Request body is not valid JSON or has wrong types."},
 	apperr.MissingIdempotencyKey: {http.StatusBadRequest, "Idempotency-Key header is missing or not a UUID."},
 	apperr.Unauthenticated:       {http.StatusUnauthorized, "Authentication required."},
+	apperr.AccessTokenExpired:    {http.StatusUnauthorized, "Access token expired; refresh and retry."},
+	apperr.SessionRevoked:        {http.StatusUnauthorized, "Session was revoked."},
+	apperr.SessionExpired:        {http.StatusUnauthorized, "Session reached its maximum age."},
 	apperr.QuotaExceeded:         {http.StatusPaymentRequired, "Not enough remaining quota."},
 	apperr.EntitlementInactive:   {http.StatusPaymentRequired, "Entitlement is inactive or outside its period."},
 	apperr.InvalidSignature:      {http.StatusForbidden, "Signed URL signature is invalid."},
@@ -54,7 +60,7 @@ var codeTable = map[apperr.Code]codeInfo{
 	apperr.AudioCorrupt:          {http.StatusUnprocessableEntity, "Audio file is corrupt."},
 	apperr.AudioEmpty:            {http.StatusUnprocessableEntity, "Audio is too short."},
 	apperr.AudioTooLong:          {http.StatusUnprocessableEntity, "Audio is too long."},
-	apperr.RateLimited:           {http.StatusTooManyRequests, "AI generation limit reached."},
+	apperr.AIGenerationLimit:     {http.StatusTooManyRequests, "AI generation limit reached."},
 	apperr.Internal:              {http.StatusInternalServerError, "Internal error."},
 	apperr.Unavailable:           {http.StatusServiceUnavailable, "Service unavailable."},
 }
@@ -93,7 +99,7 @@ func toAppErr(err error) *apperr.Error {
 }
 
 // writeError writes the error envelope; 5xx are logged with the error (never request
-// content). Retry-After is set for rate_limited.
+// content). Retry-After is set for ai_generation_limit (seconds until next_slot_at).
 func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	ae := toAppErr(err)
 	info := codeTable[ae.Code]
@@ -104,9 +110,9 @@ func (s *Server) writeError(w http.ResponseWriter, r *http.Request, err error) {
 	if details == nil {
 		details = map[string]any{}
 	}
-	if ae.Code == apperr.RateLimited {
-		if v, ok := details["retry_after_seconds"].(int64); ok {
-			w.Header().Set("Retry-After", strconv.FormatInt(v, 10))
+	if ae.Code == apperr.AIGenerationLimit {
+		if at, ok := details["next_slot_at"].(*jsonx.Time); ok && at != nil {
+			w.Header().Set("Retry-After", strconv.FormatInt(max(1, int64(math.Ceil(time.Until(at.Time).Seconds()))), 10))
 		}
 	}
 	writeJSON(w, info.status, errorBody{Error: errorObj{

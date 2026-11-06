@@ -23,6 +23,9 @@ Pushed from Library toolbar gear. `Form` (swiftui stack rule "Use Form for setti
 │ PAKET                             │
 │  Paket            Uji coba        │ LabeledContent
 │  Berlaku sampai   30 Nov 2026     │
+│  ✦ 30 generasi AI per 24 jam   Sisa 4 │ LabeledContent (adaptive; stacks at accessibility sizes)
+│  ⌛ Slot berikutnya tersedia 14.30 (dalam 2 jam) │ footnote, only when 0 left
+│  Catatan otomatis serta setiap pembuatan… memakai satu. │ footnote
 │  footnote: Pembelian paket belum tersedia di versi pilot.
 │ BAHASA                            │
 │  Bahasa aplikasi          Indonesia ›   (opens iOS Settings)
@@ -56,7 +59,8 @@ Pushed from Library toolbar gear. `Form` (swiftui stack rule "Use Form for setti
 | Usage | offline | last known values + footnote `settings.usage.stale` ("Terakhir diperbarui %@") | — |
 | Usage | error | inline `settings.usage.error` | Coba lagi |
 | Plan | entitlement `status` `active` / `expired` / `inactive` | LabeledContent: plan name (`trial` → `plan.trial`; unknown plan ids shown as returned) + status word (`plan.status.*`) | — |
-| AI regenerate allowance | from `ai_generations` | row `settings.ai.limit` | — |
+| AI generations (C2) | from `/v1/usage.ai_generations` `{limit, window_hours, used, reserved, remaining, next_slot_at}` | `sparkles` label `ai.allowance.label` ("30 generasi AI per 24 jam", numbers from the server) with value `ai.allowance.left` ("Sisa n"); footnote `ai.allowance.footnote` | — |
+| AI generations used up (`remaining` = 0) | same row, value "Sisa 0" | adds `hourglass` footnote `ai.allowance.next` with `next_slot_at` as time (date too when not today) plus relative time, e.g. "Slot berikutnya tersedia 14.30 (dalam 2 jam)"; the row is one VoiceOver element | — |
 | Language | output language → `PATCH /v1/me {language}`; transcript language → local default for new meetings | saved locally immediately, synced | — |
 | Language | sync failed | footnote `settings.syncPending` | auto retry |
 | Local audio toggle | default off. On → local audio of meetings with a transcript is deleted (never before the transcript exists: until then cloud audio may be the only other copy); existing eligible copies deleted after confirm | confirm dialog `settings.localAudio.confirm` | — |
@@ -94,7 +98,10 @@ Pushed from Library toolbar gear. `Form` (swiftui stack rule "Use Form for setti
 | plan.status.active | Aktif | Active |
 | plan.status.expired | Berakhir | Expired |
 | plan.status.inactive | Tidak aktif | Inactive |
-| settings.ai.limit | Pembuatan ulang AI: %1$lld dari %2$lld (24 jam) | AI regenerations: %1$lld of %2$lld (24 hours) |
+| ai.allowance.label | %1$lld generasi AI per %2$lld jam | %1$lld AI generations per %2$lld hours |
+| ai.allowance.left | Sisa %lld | %lld left |
+| ai.allowance.next | Slot berikutnya tersedia %@ | Next slot available %@ |
+| ai.allowance.footnote | Catatan otomatis serta setiap pembuatan atau pembuatan ulang catatan dan MoM memakai satu. | Automatic notes and each notes or minutes generation or regeneration use one. |
 | settings.plan.footnote | Pembelian paket belum tersedia di versi pilot. | Plan purchases aren't available in the pilot version. |
 | settings.language | Bahasa | Language |
 | settings.language.app | Bahasa aplikasi | App language |

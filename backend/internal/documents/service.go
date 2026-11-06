@@ -346,16 +346,18 @@ func revisionSources(ctx context.Context, q db.Querier, documentID string, n int
 	return s, err
 }
 
-func loadSegments(ctx context.Context, q db.Querier, transcriptRevisionID string) ([]segment, error) {
+func loadSegments(ctx context.Context, q db.Querier, transcriptRevisionID string) ([]segment, bool, error) {
 	var raw []byte
-	if err := q.QueryRow(ctx, `SELECT segments FROM transcript_revisions WHERE id = $1`, transcriptRevisionID).Scan(&raw); err != nil {
-		return nil, err
+	var approximate bool
+	if err := q.QueryRow(ctx, `SELECT segments, timing = 'chunk' FROM transcript_revisions WHERE id = $1`,
+		transcriptRevisionID).Scan(&raw, &approximate); err != nil {
+		return nil, false, err
 	}
 	var segs []segment
 	if err := json.Unmarshal(raw, &segs); err != nil {
-		return nil, err
+		return nil, false, err
 	}
-	return segs, nil
+	return segs, approximate, nil
 }
 
 func loadManualNotes(ctx context.Context, q db.Querier, revisionID string) (*ManualNotes, error) {
@@ -374,10 +376,11 @@ func loadManualNotes(ctx context.Context, q db.Querier, revisionID string) (*Man
 func pinsFor(ctx context.Context, q db.Querier, src sourceIDs) (Pins, error) {
 	var p Pins
 	if src.transcript != nil {
-		segs, err := loadSegments(ctx, q, *src.transcript)
+		segs, approximate, err := loadSegments(ctx, q, *src.transcript)
 		if err != nil {
 			return p, err
 		}
+		p.Approximate = approximate
 		p.Segments = make(map[string]Span, len(segs))
 		for _, g := range segs {
 			p.Segments[g.ID] = Span{g.StartMS, g.EndMS}

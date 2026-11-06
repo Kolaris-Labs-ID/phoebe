@@ -13,6 +13,7 @@ const (
 	StateUploaded            = "uploaded"
 	StateTranscribing        = "transcribing"
 	StateTranscriptionFailed = "transcription_failed"
+	StateTranscriptReady     = "transcript_ready"
 	StateGeneratingNotes     = "generating_notes"
 	StateNotesFailed         = "notes_failed"
 	StateNotesReady          = "notes_ready"
@@ -26,9 +27,10 @@ const (
 	UploadVerified                    // uploading → uploaded
 	UploadAbandoned                   // uploading → awaiting_audio, only when no open/verifying session is left
 	TranscriptionStarted              // uploaded|transcription_failed → transcribing
-	TranscriptWritten                 // transcribing → generating_notes
+	TranscriptWritten                 // transcribing → generating_notes (notes "auto")
+	TranscriptOnly                    // transcribing → transcript_ready (notes "skip")
 	TranscriptionFailed               // transcribing → transcription_failed
-	NotesRequested                    // notes_ready|notes_failed → generating_notes
+	NotesRequested                    // transcript_ready|notes_ready|notes_failed → generating_notes
 	NotesWritten                      // generating_notes → notes_ready
 	NotesFailed                       // generating_notes → notes_failed
 )
@@ -42,8 +44,9 @@ var transitions = map[Event]struct {
 	UploadAbandoned:      {[]string{StateUploading}, StateAwaitingAudio},
 	TranscriptionStarted: {[]string{StateUploaded, StateTranscriptionFailed}, StateTranscribing},
 	TranscriptWritten:    {[]string{StateTranscribing}, StateGeneratingNotes},
+	TranscriptOnly:       {[]string{StateTranscribing}, StateTranscriptReady},
 	TranscriptionFailed:  {[]string{StateTranscribing}, StateTranscriptionFailed},
-	NotesRequested:       {[]string{StateNotesReady, StateNotesFailed}, StateGeneratingNotes},
+	NotesRequested:       {[]string{StateTranscriptReady, StateNotesReady, StateNotesFailed}, StateGeneratingNotes},
 	NotesWritten:         {[]string{StateGeneratingNotes}, StateNotesReady},
 	NotesFailed:          {[]string{StateGeneratingNotes}, StateNotesFailed},
 }

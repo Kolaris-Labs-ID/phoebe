@@ -22,8 +22,8 @@ func TestFixtures(t *testing.T) {
 	m := CreateMeeting(t, pool, u.ID)
 	sum := sha256.Sum256([]byte(u.Token))
 	var owner string
-	if err := pool.QueryRow(ctx, `SELECT s.user_id FROM sessions s JOIN meetings m ON m.user_id = s.user_id
-		WHERE s.token_hash = $1 AND m.id = $2`, sum[:], m).Scan(&owner); err != nil || owner != u.ID {
+	if err := pool.QueryRow(ctx, `SELECT s.user_id FROM session_tokens t JOIN sessions s ON s.id = t.session_id
+		JOIN meetings m ON m.user_id = s.user_id WHERE t.access_token_hash = $1 AND m.id = $2`, sum[:], m).Scan(&owner); err != nil || owner != u.ID {
 		t.Fatal(owner, err)
 	}
 	var q int64

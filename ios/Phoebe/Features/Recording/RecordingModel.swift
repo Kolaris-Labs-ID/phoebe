@@ -3,12 +3,13 @@ import SwiftData
 import SwiftUI
 
 enum RecordingNextStep: Equatable {
-    case upload, offline, quota, plan
+    case upload, offline, quota, plan, aiSlot
 
     static func make(isOnline: Bool, usage: UsageDTO?, durationMs: Int) -> RecordingNextStep {
         if let usage {
             if usage.entitlement.status != .active { return .plan }
             if usage.remainingSeconds < Int((Double(durationMs) / 1000).rounded(.up)) { return .quota }
+            if AIAllowance.needsChoice(usage: usage, notes: .auto) { return .aiSlot }
         }
         return isOnline ? .upload : .offline
     }
@@ -19,6 +20,7 @@ enum RecordingNextStep: Equatable {
         case .offline: "rec.stopped.next.offline"
         case .quota: "rec.stopped.next.quota"
         case .plan: "rec.stopped.next.plan"
+        case .aiSlot: "rec.stopped.next.aiSlot"
         }
     }
 }

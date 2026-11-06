@@ -53,7 +53,7 @@ enum MeetingStatus {
         case nil: break
         }
         if input.pipeline == .notesReady { return .notesReady }
-        if input.hasTranscript || input.pipeline == .generatingNotes || input.pipeline == .notesFailed { return .transcriptReady }
+        if input.hasTranscript || [.transcriptReady, .generatingNotes, .notesFailed].contains(input.pipeline) { return .transcriptReady }
         if !input.isServerCreated && input.localPhase == .none { return .localOnly }
         return nil
     }

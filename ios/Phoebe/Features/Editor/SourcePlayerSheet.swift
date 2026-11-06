@@ -108,9 +108,12 @@ struct SourcePlayerSheet: View {
             .disabled(player.state != .ready)
             .accessibilityLabel(Text(L(player.isPlaying ? "player.pause" : "player.play", table: .editor)))
             VStack(alignment: .leading, spacing: Spacing.xs) {
-                Text(EditorText.plain("\(Formatting.timestamp(ms: request.startMs))–\(Formatting.timestamp(ms: request.endMs))"))
+                Text(EditorText.plain("\(Formatting.timestamp(ms: request.startMs, approximate: request.approximate))–\(Formatting.timestamp(ms: request.endMs, approximate: request.approximate))"))
                     .font(Typography.caption.monospacedDigit())
                     .foregroundStyle(Palette.textSecondary)
+                    .accessibilityLabel(Text(verbatim: request.approximate
+                        ? "\(Formatting.spokenTimestamp(ms: request.startMs, approximate: true)) – \(Formatting.spokenTimestamp(ms: request.endMs, approximate: true))"
+                        : "\(Formatting.timestamp(ms: request.startMs))–\(Formatting.timestamp(ms: request.endMs))"))
                 if let text = request.text {
                     Text(EditorText.plain(text))
                         .font(Typography.callout)

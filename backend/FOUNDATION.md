@@ -53,7 +53,7 @@ Always log with `log.InfoContext(ctx, "event.name", allowed-fields…)`. Allowed
 config.Load() (*Config, error); config.LoadFrom(getenv func(string) string) (*Config, error)
 (*Config).AppleConfigured() bool; (*Config).CheckAPIStartup() error; (*Config).String() string  // redacted
 ```
-Fields mirror §16 in CamelCase: `DatabaseURL, HTTPAddr, PublicBaseURL, SigningSecret []byte, SubjectPepper []byte, SignedURLTTL, StorageDir, AppleBundleID, AppleJWKSURL, AppleTokenURL, AppleRevokeURL, AppleTeamID, AppleKeyID, ApplePrivateKey, TokenEncKey []byte (32), DevLoginEnabled, SessionTTL, MaxAudioSeconds int64, MaxUploadBytes int64, UploadChunkMaxBytes int64, UploadSessionTTL, UploadWriterLease, AudioRetentionDays int, TrialQuotaMinutes int64, TrialPeriodDays int, AIUserJobsPerDay int, PurgeDelay, STTProvider, STTBaseURL, STTAPIKey, STTModel, STTRequestTimeout, STTMaxFileBytes int64, STTChunkSeconds int, STTPricePerMin float64, FFmpegPath, LLMProvider, LLMBaseURL, LLMAPIKey, LLMModel, LLMTemperature float64, LLMRequestTimeout, LLMMaxTranscriptChars int, LLMPriceInPerMTok, LLMPriceOutPerMTok float64, WorkerID, WorkerConcurrency int, WorkerPollInterval, WorkerShutdownGrace, JobLease, JobTimeoutTranscribeMax, JobTimeoutGenerateMax, JobRetryBase, SweepInterval, AlertQueueAge, AlertDailyCostUSD float64, LogLevel slog.Level`. Durations are `time.Duration`. Secrets (hex or base64) are decoded bytes.
+Fields mirror §16 in CamelCase: `DatabaseURL, HTTPAddr, PublicBaseURL, SigningSecret []byte, SubjectPepper []byte, SignedURLTTL, StorageDir, AppleBundleID, AppleJWKSURL, AppleTokenURL, AppleRevokeURL, AppleTeamID, AppleKeyID, ApplePrivateKey, TokenEncKey []byte (32), DevLoginEnabled, AccessTokenTTL, SessionMaxAge, RefreshReuseGrace, MaxAudioSeconds int64, MaxUploadBytes int64, UploadChunkMaxBytes int64, UploadSessionTTL, UploadWriterLease, AudioRetentionDays int, TrialQuotaMinutes int64, TrialPeriodDays int, AIGenerationLimit int, AIGenerationWindow, PurgeDelay, STTProvider, STTBaseURL, STTAPIKey, STTModel, STTRequestTimeout, STTMaxFileBytes int64, STTChunkSeconds int, STTPricePerMin float64, FFmpegPath, STTChunkTargetSeconds, STTChunkMinSeconds, STTChunkMaxSeconds int, STTSilenceNoiseDB float64, STTSilenceMinDuration, STTDropSilenceRatio, STTUncertainMeanLogprob, STTUncertainAvgLogprob, STTUncertainNoSpeechProb, STTUncertainCompressionRatio float64, LLMProvider, LLMBaseURL, LLMAPIKey, LLMModel, LLMTemperature float64, LLMRequestTimeout, LLMMaxTranscriptChars int, LLMPriceInPerMTok, LLMPriceOutPerMTok float64, LLMThinkingNotes, LLMThinkingMoM bool, WorkerID, WorkerConcurrency int, WorkerPollInterval, WorkerShutdownGrace, JobLease, JobTimeoutTranscribeMax, JobTimeoutGenerateMax, JobRetryBase, SweepInterval, AlertQueueAge, AlertDailyCostUSD float64, LogLevel slog.Level`. Durations are `time.Duration`. Secrets (hex or base64) are decoded bytes.
 
 ## db
 
@@ -73,7 +73,7 @@ db.LockLiveMeeting(ctx, q, meetingID) (userID string, err)   // worker finalize 
 db.TryLockLiveMeeting(ctx, q, meetingID) (ok bool, err)      // sweeps: FOR UPDATE SKIP LOCKED; false = skip item
 db.TouchMeeting(ctx, q, meetingID) error                     // meetings.updated_at = now() (§3.5)
 ```
-Lock order: meeting → upload session → document → job → entitlement → quota reservation. No network/storage I/O inside a tx.
+Lock order: meeting → upload session → document → job → entitlement → quota reservation → AI generation slot. No network/storage I/O inside a tx.
 
 ## storage
 
@@ -99,6 +99,20 @@ storage.NewSigner(secret []byte, publicBaseURL string, ttl time.Duration) *Signe
 **Append** (deviation from §12's signature, needed for §7.2 "commit while still holding the flock"): non-blocking `flock` (held → `ErrBusy`), file shorter than offset → `ErrShort`, truncate to offset, stream `r` (caller wraps it in `io.LimitReader(body, limit+1)` and treats `written > limit` as `chunk_too_large`/`upload_too_large` inside `commit` by not committing), `renew` after every 4 MiB (error → stop, no commit, returned), fsync, then `commit(written)` under the lock — also after a body read error / ctx cancel, so persisted bytes count. Use `context.WithoutCancel` for DB work inside `commit`. Returned err precedence: lock/open/truncate, renew, commit, read/write.
 
 Keys: `u/<uid>/m/<mid>/uploads/<session>.part`, `u/<uid>/m/<mid>/audio/<session>.<ext>`, `u/<uid>/m/<mid>/exports/<export>.<ext>`. The orphan sweep (`meetings.OrphanSweep`) deletes any object older than 24 h that does not match one of these and is not referenced by its row, so new key layouts must be added to `meetings.referenced`.
+
+## ai / audio
+
+```go
+ai.STT.Transcribe(ctx, ai.STTInput{Reader, Filename, ContentType, Language, DurationMS}) (ai.STTResult{Language, Timing, Segments []ai.Segment, AudioMS}, error)
+ai.Segment{StartMS, EndMS int64; Text string; Uncertain bool; UncertainReason string}   // absolute ms; reason "" unless Uncertain
+ai.TimingSegment | ai.TimingChunk; ai.UncertainLowConfidence
+ai.LLM.Complete(ai.WithTask(ctx, ai.TaskNotes|ai.TaskMoM), system, user) (ai.LLMResult, error)   // task selects per-task options (DeepSeek thinking)
+audio.DetectSilence(ctx, ffmpeg, path, durationMS, audio.SilenceParams) ([]audio.Interval, error)
+audio.Coverage(silences, startMS, endMS) float64; audio.PlanWindows(durationMS, silences, audio.WindowPlan) []audio.Interval
+audio.Extract(ctx, ffmpeg, src, dst, startMS, durMS) error   // mono 16 kHz AAC m4a; durMS ≤ 0 = to the end
+audio.Chunker{ChunkSeconds}.Count(durationMS) int            // whisper-1 fixed pieces above STT_MAX_FILE_BYTES
+```
+One `Transcribe` takes the whole file; the OpenAI adapter plans silence-aligned windows (chunk timing) or fixed pieces (whisper-1) itself, times each HTTP request with `STT_REQUEST_TIMEOUT`, never retries internally, and only drops a segment that is empty or both low-confidence and mostly silent (backend.md §6.1). Callers bound the whole call with the job timeout.
 
 ## jobs
 
@@ -164,7 +178,7 @@ type Deps struct { Config *config.Config; Log *slog.Logger; DB *pgxpool.Pool; St
                    Sessions SessionResolver; Auth AuthService; Users UsersService; Meetings MeetingsService; FoldersTags FoldersTagsService;
                    Uploads UploadsService; Transcripts TranscriptsService; Documents DocumentsService; Exports ExportsService;
                    Files FilesService; Usage UsageService; Events EventsService }
-type SessionResolver interface { ResolveSession(ctx, token string) (userID, sessionID string, err error) }  // miss → apperr Unauthenticated
+type SessionResolver interface { ResolveSession(ctx, token string) (userID, sessionID string, err error) }  // miss → Unauthenticated; also AccessTokenExpired | SessionRevoked | SessionExpired
 func New(d Deps) *Server            // http.Handler; tests: httptest.NewServer(httpapi.New(deps))
 (*Server).Routes() []Route          // for the cross-account test
 type Route struct { Method, Path string; Public bool; BodyLimit int64; Handle HandlerFunc }   // Path is a net/http pattern "/v1/meetings/{id}"
@@ -196,7 +210,7 @@ testutil.DB(t) *pgxpool.Pool                // fresh migrated phoebe_test_<hex>;
 testutil.Storage(t) *storage.LocalFS        // on t.TempDir()
 testutil.Config(t) *config.Config           // valid; fake providers; dev login; PUBLIC_BASE_URL http://phoebe.test
 testutil.Logger(t) *slog.Logger; testutil.DiscardLogger() *slog.Logger
-testutil.CreateUser(t, q, quotaSeconds) User{ID, Token}   // dev user + active trial entitlement + session (token_hash = sha256(token))
+testutil.CreateUser(t, q, quotaSeconds) User{ID, Token}   // dev user + active trial entitlement + session; Token = access token valid 1 day
 testutil.CreateSession(t, q, userID) (token string)
 testutil.CreateMeeting(t, q, userID) (meetingID string)  // awaiting_audio, Asia/Jakarta, started_at now
 testutil.WAV(durationMS int64) []byte                     // PCM 16-bit mono 8 kHz tone (16 000 B/s + 44 B header)
@@ -219,15 +233,16 @@ meetings.New(pool *pgxpool.Pool, cfg *config.Config, store storage.Storage, log 
 
 // pipeline_state (backend.md §3.1) — call inside your tx, after the meeting lock; bumps updated_at only when the state changed.
 const StateAwaitingAudio, StateUploading, StateUploaded, StateTranscribing, StateTranscriptionFailed,
-      StateGeneratingNotes, StateNotesFailed, StateNotesReady
+      StateTranscriptReady, StateGeneratingNotes, StateNotesFailed, StateNotesReady
 type Event int
 const UploadCreated        // awaiting_audio|uploading → uploading            (upload session create)
       UploadVerified       // uploading → uploaded                            (complete finalize)
       UploadAbandoned      // uploading → awaiting_audio iff no open/verifying session remains (set the session's status FIRST)
       TranscriptionStarted // uploaded|transcription_failed → transcribing    (start transcription tx)
-      TranscriptWritten    // transcribing → generating_notes                 (transcribe success finalize)
+      TranscriptWritten    // transcribing → generating_notes                 (transcribe success finalize, notes auto)
+      TranscriptOnly       // transcribing → transcript_ready                 (transcribe success finalize, notes skip)
       TranscriptionFailed  // transcribing → transcription_failed             (transcribe OnFailure)
-      NotesRequested       // notes_ready|notes_failed → generating_notes     (user generate_notes)
+      NotesRequested       // transcript_ready|notes_ready|notes_failed → generating_notes (user generate_notes)
       NotesWritten         // generating_notes → notes_ready                  (notes finalize)
       NotesFailed          // generating_notes → notes_failed                 (notes OnFailure)
 func Transition(ctx, q db.Querier, meetingID string, ev Event) (changed bool, err error)   // not in a from-state → false, nothing written

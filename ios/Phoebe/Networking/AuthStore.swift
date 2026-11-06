@@ -5,27 +5,39 @@ enum SignInMethod: String, Sendable {
     case apple, dev
 }
 
-struct AuthStore: Sendable {
+protocol TokenStore: Sendable {
+    var tokens: TokenPairDTO? { get }
+    func saveTokens(_ tokens: TokenPairDTO)
+}
+
+struct AuthStore: TokenStore {
     enum Key: String, CaseIterable, Sendable {
-        case token, appleUserID, pendingDisplayName, signInMethod, userID
+        case tokens, appleUserID, pendingDisplayName, signInMethod, userID
     }
 
     var service = "com.kolarislabs.phoebe.auth"
 
-    var token: String? { value(for: .token) }
+    // One item so access token, refresh token and expiries are always written together.
+    var tokens: TokenPairDTO? {
+        value(for: .tokens).flatMap { try? APICoding.decoder().decode(TokenPairDTO.self, from: Data($0.utf8)) }
+    }
     var appleUserID: String? { value(for: .appleUserID) }
     var pendingDisplayName: String? { value(for: .pendingDisplayName) }
     var signInMethod: SignInMethod? { value(for: .signInMethod).flatMap(SignInMethod.init(rawValue:)) }
     var userID: UUID? { value(for: .userID).flatMap(UUID.init(uuidString:)) }
 
-    func saveSession(token: String, userID: UUID, method: SignInMethod) {
-        set(token, for: .token)
+    func saveTokens(_ tokens: TokenPairDTO) {
+        set(String(decoding: APICoding.encode(tokens), as: UTF8.self), for: .tokens)
+    }
+
+    func saveSession(tokens: TokenPairDTO, userID: UUID, method: SignInMethod) {
+        saveTokens(tokens)
         set(userID.lower, for: .userID)
         set(method.rawValue, for: .signInMethod)
     }
 
     func clearSession() {
-        for key in [Key.token, .userID, .signInMethod, .appleUserID] { set(nil, for: key) }
+        for key in [Key.tokens, .userID, .signInMethod, .appleUserID] { set(nil, for: key) }
     }
 
     func value(for key: Key) -> String? {

@@ -6,7 +6,7 @@ struct RefContext {
     let onSeek: (Int) -> Void
 
     func isVerified(_ ref: SourceRef) -> Bool {
-        guard case .transcript(let segmentId, _, _) = ref, let ids = verifiedSegmentIDs else { return true }
+        guard case .transcript(let segmentId, _, _, _) = ref, let ids = verifiedSegmentIDs else { return true }
         return ids.contains(segmentId)
     }
 }

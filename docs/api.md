@@ -5,7 +5,7 @@ Contract between the iOS app and the Go backend. Backend design and invariants: 
 ## 1 Conventions
 
 - Base path `/v1`. JSON request/response, `Content-Type: application/json; charset=utf-8`, UTF-8, snake_case keys.
-- Auth: `Authorization: Bearer <token>` on every endpoint except `GET /healthz`, `GET /v1/config`, `POST /v1/auth/apple`, `POST /v1/auth/dev`, `GET /v1/files/...` (signed).
+- Auth: `Authorization: Bearer <access_token>` on every endpoint except `GET /healthz`, `GET /v1/config`, `POST /v1/auth/apple`, `POST /v1/auth/dev`, `POST /v1/auth/refresh`, `GET /v1/files/...` (signed). Token lifecycle: §4.1.
 - IDs: lowercase UUID strings. Meeting IDs may be client-generated (UUIDv4).
 - Timestamps: RFC3339, UTC, millisecond precision, always with fraction: `"2026-11-06T02:00:00.000Z"`. Inputs accept any RFC3339 offset; server normalizes to UTC. iOS: `Date.ISO8601FormatStyle(includingFractionalSeconds: true)` (Sendable).
 - Dates without time (action item deadline): `"YYYY-MM-DD"`.
@@ -42,7 +42,10 @@ Every non-2xx response:
 |---|---|---|
 | 400 | `invalid_json` | Body not parseable / wrong types |
 | 400 | `missing_idempotency_key` | `Idempotency-Key` header absent or not a UUID |
-| 401 | `unauthenticated` | Missing, unknown, expired, or revoked token; account deleted |
+| 401 | `unauthenticated` | Missing or unknown token (also an access token whose pair was dropped by the refresh reuse grace) |
+| 401 | `access_token_expired` | Access token past `access_token_expires_at`; session still valid. Client refreshes and retries once |
+| 401 | `session_revoked` | Session family revoked: logout, refresh-token reuse, or account deletion. Sign in again |
+| 401 | `session_expired` | Session past `session_expires_at` (absolute max age). Sign in again |
 | 402 | `quota_exceeded` | Not enough remaining quota. details `{required_seconds, remaining_seconds}` |
 | 402 | `entitlement_inactive` | Entitlement inactive or outside its period. details `{period_end}` |
 | 403 | `invalid_signature` | Signed file URL signature wrong |
@@ -76,7 +79,7 @@ Every non-2xx response:
 | 422 | `audio_corrupt` | Container unreadable / no duration |
 | 422 | `audio_empty` | Duration < 1000 ms |
 | 422 | `audio_too_long` | Duration > max. details `{duration_ms, max_duration_ms}` |
-| 429 | `rate_limited` | AI generation limit hit. `Retry-After` header + details `{retry_after_seconds}` |
+| 429 | `ai_generation_limit` | No AI generation slot left in the rolling window (§4.10). `Retry-After` header (seconds until `next_slot_at`) + details `{limit, remaining: 0, next_slot_at}`. Nothing was reserved and nothing is stored for the `Idempotency-Key`: the same request may be retried |
 | 500 | `internal` | Bug; request_id for support |
 | 503 | `unavailable` | Database unavailable |
 
@@ -154,22 +157,26 @@ Name: trimmed, 1–60 chars, unique per user case-insensitive.
 
 ### SourceRef
 ```json
-{ "type": "transcript", "segment_id": "s42", "start_ms": 734000, "end_ms": 741500 }
+{ "type": "transcript", "segment_id": "s42", "start_ms": 734000, "end_ms": 741500, "approximate": true }
 { "type": "user_notes", "note_id": "n3" }
 ```
-Transcript refs resolve against the revision's `source.transcript_revision_id`; `start_ms/end_ms` are always overwritten by the server from that revision. User-notes refs resolve against `source.manual_notes_revision_id`. Render transcript refs as `[mm:ss]` (`[h:mm:ss]` ≥ 1 h); user-notes refs as "Dari catatan pengguna" / "From user notes".
+Transcript refs resolve against the revision's `source.transcript_revision_id`; `start_ms/end_ms` are always overwritten by the server from that revision. `approximate` (bool, always present on transcript refs in responses) is also server-set: `true` iff that transcript revision's `timing` is `chunk` (times are chunk bounds, not provider timestamps). LLM output never controls it; on writes it is optional, must be a bool if sent, and the client value is ignored (clients never send `false` for chunk timing). User-notes refs resolve against `source.manual_notes_revision_id` and carry no `approximate`. Render transcript refs as `[mm:ss]` (`[h:mm:ss]` ≥ 1 h), approximate ones as `[~mm:ss]` (`[~h:mm:ss]`; VoiceOver id "sekitar <waktu>", en "about <time>"); user-notes refs as "Dari catatan pengguna" / "From user notes". `schema_version` stays 1.
 
 ### Transcript revision
 ```json
 {
-  "id": "uuid", "revision_number": 1, "kind": "original", "language": "id",
+  "id": "uuid", "revision_number": 1, "kind": "original", "language": "id", "timing": "chunk",
   "created_at": "…",
   "segments": [
-    { "id": "s1", "start_ms": 0, "end_ms": 4200, "text": "Selamat pagi semua." }
+    { "id": "s1", "start_ms": 0, "end_ms": 30000, "text": "Selamat pagi semua.", "uncertain": false, "uncertain_reason": null },
+    { "id": "s2", "start_ms": 30000, "end_ms": 58400, "text": "Anggarannya tiga belas juta.", "uncertain": true, "uncertain_reason": "low_confidence" }
   ]
 }
 ```
-`kind`: `original|correction`. Segment ids `s1…sN` assigned in order on the original and stable across corrections; corrections change `text` only. Segments are sorted by `start_ms`, `0 ≤ start_ms ≤ end_ms ≤ audio duration`.
+`kind`: `original|correction`. Segment ids `s1…sN` assigned in order on the original and stable across corrections; corrections change `text` (and clear `uncertain`) only. Segments are sorted by `start_ms`, `0 ≤ start_ms ≤ end_ms ≤ audio duration`.
+- `timing`: `segment` = provider-native segment timestamps (whisper-1); `chunk` = our silence-aligned recording sections (about 30 s): `start_ms/end_ms` are the section bounds and are **approximate** (render `~mm:ss`; the transcript tab shows the note id "Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik)." / en "Times are approximate, per recording section (about 30 seconds)."). There are never word-level timestamps. Corrections inherit the revision's `timing`. Also present on revision listing items.
+- `language`: the provider-detected language when the provider reports one (whisper-1: `id`, `en`, or another language's lowercase name ≤ 16 chars, e.g. `javanese`); otherwise the requested `id|en`; `auto` = requested auto and not detected (the default gpt-4o transcribe models never report a language). Never empty. Corrections inherit it. Also present on revision listing items.
+- `uncertain` (bool) / `uncertain_reason` (`null|low_confidence`): the provider's confidence was low but the speech was kept (it is only dropped when silence also covers it); the user should review it (UI: SF Symbol + "Perlu ditinjau" / "Needs review", not color alone). AI prompts mark these segments as unverified data. Exports never show uncertainty.
 
 ### Document summary
 ```json
@@ -305,9 +312,21 @@ iOS validates imports against these before upload and shows retention before upl
 ```
 `nonce` = raw nonce; iOS sends `sha256hex(raw)` as the Apple request nonce. `display_name` optional (Apple gives the name only on first authorization; iOS keeps it until a 2xx); used only when creating the user or when the stored name is empty. `authorization_code` (optional, from `ASAuthorizationAppleIDCredential.authorizationCode`): exchanged server-side for a refresh token, stored encrypted, used only to revoke Apple tokens when the account is deleted. → `200`
 ```json
-{ "token": "phb_…", "expires_at": "…", "created": true, "user": User }
+{
+  "user": User,
+  "access_token": "…", "access_token_expires_at": "…",
+  "refresh_token": "…", "refresh_token_expires_at": "…",
+  "session_expires_at": "…",
+  "created": true
+}
 ```
 Errors: `401 unauthenticated` (bad signature, iss, aud, exp, nonce), `422 validation_failed`.
+
+Sessions: every sign-in opens a new session (token family). Tokens are opaque: 32 random bytes, base64url without padding (43 chars); the server stores only their SHA-256.
+- `session_expires_at` = sign-in + `SESSION_MAX_AGE` (default 180 days). Absolute: never extended by refresh.
+- Access token: valid `ACCESS_TOKEN_TTL` (default 15 min), never beyond `session_expires_at`. An access token stays valid until its own expiry after the pair is rotated.
+- Refresh token: single-use, valid until `refresh_token_expires_at` (= `session_expires_at`).
+- `created` is extra to the shared contract (true when the account was created by this sign-in).
 
 **POST /v1/auth/dev** (no auth; route exists only when `DEV_LOGIN_ENABLED=true`, else `404`)
 ```json
@@ -315,7 +334,17 @@ Errors: `401 unauthenticated` (bad signature, iss, aud, exp, nonce), `422 valida
 ```
 `subject`: 1–64 chars `[a-z0-9._-]`. Same response as Apple.
 
-**POST /v1/auth/logout** → `204`. Revokes the calling session.
+**POST /v1/auth/refresh** (no bearer auth)
+```json
+{ "refresh_token": "…" }
+```
+→ `200 {"access_token", "access_token_expires_at", "refresh_token", "refresh_token_expires_at", "session_expires_at"}` (same `session_expires_at`; no `user`). The presented refresh token is consumed.
+- Reuse of an already-rotated refresh token: if it was rotated less than `REFRESH_REUSE_GRACE` (default 30 s) ago and its successor pair is unused (successor refresh token not exchanged and successor access token never used to authenticate), the server issues a new pair and invalidates the successor (lost-response tolerance). Otherwise the whole session family is revoked → `401 session_revoked`. Presenting an invalidated successor (its refresh token to this endpoint, or its access token on any request) also revokes the family → `401 session_revoked`.
+- Errors: `401 unauthenticated` (unknown token), `401 session_revoked`, `401 session_expired`, `422 validation_failed` (`refresh_token` missing).
+
+401 handling on any authenticated route: `access_token_expired` → refresh once, retry once. `session_revoked` / `session_expired` → sign out. `unauthenticated` → sign out.
+
+**POST /v1/auth/logout** → `204`. Revokes the calling session family (all its access and refresh tokens). Other sessions of the user stay valid. Afterwards the old tokens return `401 session_revoked`.
 
 **GET /v1/me** → `200 {"user": User}`
 
@@ -325,7 +354,7 @@ Errors: `401 unauthenticated` (bad signature, iss, aud, exp, nonce), `422 valida
 ```
 `timezone` must be a valid IANA name. → `200 {"user": User}`
 
-**DELETE /v1/me** → `202 {"purge_scheduled_at": "…"}`. Atomically: tombstones user and all meetings, revokes all sessions, cancels jobs and uploads, releases reserved quota, schedules purge (which also revokes the Apple tokens). Subsequent calls with the old token → `401`. Signing in again with the same Apple ID creates a new, empty account without a new trial (entitlement `quota_seconds: 0`; a keyed hash of the Apple subject is retained to enforce this).
+**DELETE /v1/me** → `202 {"purge_scheduled_at": "…"}`. Atomically: tombstones user and all meetings, revokes all of the user's sessions immediately (before the purge), cancels jobs and uploads, releases reserved quota, schedules purge (which also revokes the Apple tokens). Subsequent calls with any old access or refresh token → `401 session_revoked`. Signing in again with the same Apple ID creates a new, empty account without a new trial (entitlement `quota_seconds: 0`; a keyed hash of the Apple subject is retained to enforce this).
 
 ### 4.2 Meetings
 
@@ -343,7 +372,7 @@ Meeting object:
 }
 ```
 - `audio`, `upload` (latest `open` session), `transcript`, each `documents.*` and `jobs.*` (latest job of that type) are `null` when absent.
-- `pipeline_state`: `awaiting_audio|uploading|uploaded|transcribing|transcription_failed|generating_notes|notes_failed|notes_ready`. PRD "transcript ready" = `transcript != null`. MoM progress = `jobs.generate_mom.status`.
+- `pipeline_state`: `awaiting_audio|uploading|uploaded|transcribing|transcription_failed|transcript_ready|generating_notes|notes_failed|notes_ready`. `transcript_ready` = transcribed with `notes: "skip"` and no notes requested yet (§4.5). PRD "transcript ready" = `transcript != null`. MoM progress = `jobs.generate_mom.status`.
 - `source`: `recording|import`, set on create, immutable.
 - `updated_at` changes on every change visible in this object: metadata, folder/tags, `pipeline_state`, any job status change (incl. retries), upload session changes, audio verify/delete/expiry, new transcript or document revision, review set/clear (backend.md §3.5). Clients refetch a meeting only when `updated_at` changed.
 
@@ -415,11 +444,11 @@ Flow: create session → PUT chunks (resume via GET) → last chunk verifies and
 **POST /v1/meetings/{id}/uploads**
 ```json
 { "size_bytes": 28311552, "sha256": "hex64-lowercase", "content_type": "audio/mp4", "duration_ms": 3600000,
-  "transcription": { "idempotency_key": "uuid", "language": "auto" } }
+  "transcription": { "idempotency_key": "uuid", "language": "auto", "notes": "auto" } }
 ```
 - `content_type`: `audio/mp4` (aliases `audio/m4a`, `audio/x-m4a`), `audio/mpeg`, `audio/wav` (aliases `audio/x-wav`, `audio/wave`); stored normalized. Declared type is a hint; the server detects the real type at complete.
 - `duration_ms`: client-measured; used only for early rejection (`audio_too_long`). Server-computed duration is authoritative.
-- `transcription` optional (`null`/absent = no auto-start). When set, verification of the last byte starts transcription server-side in the same transaction with this key, exactly as `POST …/transcription` with header `Idempotency-Key: <idempotency_key>` and body `{"language": "<language>"}` would. Lets processing start while the app is suspended or closed (PRD §7).
+- `transcription` optional (`null`/absent = no auto-start). When set, verification of the last byte starts transcription server-side in the same transaction with this key, exactly as `POST …/transcription` with header `Idempotency-Key: <idempotency_key>` and body `{"language": "<language>", "notes": "<notes>"}` would. `notes`: `auto` (default) | `skip` (§4.5). Lets processing start while the app is suspended or closed (PRD §7).
 - If a live (`open`/`verifying`) session exists with the same `sha256` and `size_bytes` → `200` with it (resume). With different values → `409 upload_busy` while it is being written or verified, else old session `canceled` and a new one created.
 - → `201 {"upload": UploadSession}`. Meeting `pipeline_state` → `uploading`.
 - Errors: `409 audio_exists`, `409 upload_busy`, `413 upload_too_large`, `422 audio_too_long`, `422 validation_failed`.
@@ -430,16 +459,17 @@ Flow: create session → PUT chunks (resume via GET) → last chunk verifies and
 Headers: `Content-Type: application/octet-stream`, `Upload-Offset: <int>`, `Content-Length: <int>` (required). Body: raw bytes `[offset, offset+len)`.
 - `Upload-Offset` must equal `received_bytes` → else `409 upload_offset_mismatch` (details give the correct offset).
 - If the connection drops mid-body, bytes already persisted count; client re-reads offset via GET and continues.
-- → `200 {"upload": UploadSession, "audio": null, "job": null}`.
-- The chunk that makes `received_bytes == size_bytes` runs complete inline: the response is exactly the complete response below (`200 {"upload", "audio", "job"}`) or its errors (`422 checksum_mismatch|audio_*`).
+- → `200 {"upload": UploadSession, "audio": null, "job": null, "transcription_blocked": null}`.
+- The chunk that makes `received_bytes == size_bytes` runs complete inline: the response is exactly the complete response below (`200 {"upload", "audio", "job", "transcription_blocked"}`) or its errors (`422 checksum_mismatch|audio_*`).
 - Errors: `409 upload_busy` (retry after 1–5 s), `409 upload_not_open`, `410 upload_expired`, `413 chunk_too_large`, `413 upload_too_large`.
 - iOS background `URLSession` upload tasks: one chunk per task, chunk = `min(upload_chunk_max_bytes, remaining)`.
 
 **POST /v1/uploads/{upload_id}/complete** (empty body) → `200`
 ```json
-{ "upload": UploadSession, "audio": AudioAsset, "job": Job }
+{ "upload": UploadSession, "audio": AudioAsset, "job": Job, "transcription_blocked": null }
 ```
-Server verifies `received_bytes == size_bytes`, SHA-256, real content type, duration (`> max_audio_duration_ms` rejected, no tolerance), limits; then creates the audio asset, sets `pipeline_state` → `uploaded`, and, if the session has `auto_transcription`, starts transcription (`job` = the transcribe job; `null` if not requested or not startable, e.g. quota — the explicit `POST …/transcription` returns the reason). Idempotent: completing a `completed` session returns the same result (`job` = latest transcribe job). iOS keeps its local audio at least until a transcript exists, and deletes it then only per user preference.
+Server verifies `received_bytes == size_bytes`, SHA-256, real content type, duration (`> max_audio_duration_ms` rejected, no tolerance), limits; then creates the audio asset, sets `pipeline_state` → `uploaded`, and, if the session has `auto_transcription`, starts transcription (`job` = the transcribe job; `null` if not requested or not startable, e.g. quota — the explicit `POST …/transcription` returns the reason). Idempotent: completing a `completed` session returns the same result: `job` = the job of the first response (its current state; `null` stays `null` even if a transcription was started since) and `transcription_blocked` exactly as first sent.
+`transcription_blocked`: `null`, or `{"code": "ai_generation_limit", "next_slot_at": "…"}` when auto-start with `notes: "auto"` found no AI generation slot (§4.10). Then nothing is reserved (no quota seconds, no job), `job` is `null` and the meeting stays `uploaded`; a replayed complete returns the same object (same `next_slot_at`) even after a slot frees or a transcription starts; when quota or entitlement refuses first, the first response and every replay carry `null` (the explicit `POST …/transcription` returns the `402`). The app asks the user to wait for a slot (retry later with the same key and body) or to transcribe only (`POST …/transcription` with `notes: "skip"` and a **new** key), before any minutes are used. iOS keeps its local audio at least until a transcript exists, and deletes it then only per user preference.
 Errors: `409 upload_incomplete`, `409 upload_busy` (verification in progress; retry), `409 upload_not_open` (failed/canceled), `410 upload_expired`, `422 checksum_mismatch|audio_unsupported|audio_corrupt|audio_empty|audio_too_long` (session → `failed`, meeting → `awaiting_audio`; create a new session).
 
 ### 4.5 Transcription and jobs
@@ -447,12 +477,15 @@ Errors: `409 upload_incomplete`, `409 upload_busy` (verification in progress; re
 **POST /v1/meetings/{id}/transcription**
 Header `Idempotency-Key`. Body (optional fields):
 ```json
-{ "language": "auto" }
+{ "language": "auto", "notes": "auto" }
 ```
-`language` defaults to meeting `language`. Reserves quota (`ceil(duration_ms/1000)` s) and enqueues `transcribe`. Allowed from `uploaded` or `transcription_failed`. → `202 {"job": Job}` (replay `200`). Meeting → `transcribing`. To confirm an auto-started transcription (§4.4), send the same key and the identical body `{"language": "<same value>"}` → `200` replay.
-Errors: `400 missing_idempotency_key`, `409 audio_not_ready`, `410 audio_unavailable`, `409 already_transcribed`, `409 job_in_progress`, `402 quota_exceeded`, `402 entitlement_inactive`, `422 idempotency_key_reused`.
+`language` defaults to meeting `language`. `notes`: `auto` (default) | `skip`. Reserves quota (`ceil(duration_ms/1000)` s) and enqueues `transcribe`; with `notes: "auto"` it also reserves one AI generation slot (§4.10) for the automatic notes in the same transaction. Allowed from `uploaded` or `transcription_failed`. → `202 {"job": Job}` (replay `200`). Meeting → `transcribing`. To confirm an auto-started transcription (§4.4), send the same key and the same body `{"language": "<same value>", "notes": "<same value>"}` → `200` replay (an absent `notes` counts as `"auto"` for the replay check).
+Errors: `400 missing_idempotency_key`, `409 audio_not_ready`, `410 audio_unavailable`, `409 already_transcribed`, `409 job_in_progress`, `402 quota_exceeded`, `402 entitlement_inactive`, `429 ai_generation_limit` (`notes: "auto"` only; checked after quota), `422 idempotency_key_reused`, `422 validation_failed` (`language`, `notes`).
 
-After the transcript is written, the server automatically enqueues `generate_notes` (`trigger: system`, not rate-limited). Failure categories `no_speech`, `audio_unreadable`, `audio_unavailable` are permanent; quota is released on any permanent failure.
+- `429 ai_generation_limit`: nothing is reserved (no quota seconds, no slot, no job) and the meeting stays `uploaded`. The user can wait for `next_slot_at` and retry the same request, or choose transcription only: a new intent, so `notes: "skip"` with a **new** `Idempotency-Key` (the old key's body was `auto`; reusing it → `422 idempotency_key_reused`). The app explains both before any minutes are used.
+- `notes: "auto"`: after the transcript is written, the server enqueues `generate_notes` (`trigger: system`) holding the slot reserved at start; it is not checked against the limit again, so it finishes even if the allowance filled up meanwhile. Meeting → `generating_notes`.
+- `notes: "skip"`: no slot, no notes job; meeting → `transcript_ready`. Notes can be generated later (§4.7, one slot).
+- Failure categories `no_speech`, `audio_unreadable`, `audio_unavailable` are permanent; on any permanent failure the quota reservation and the automatic-notes slot are released. Retries (attempts) reuse both.
 
 **GET /v1/meetings/{id}/jobs** → `200 {"items": [Job]}` (newest first, max 50, no cursor).
 
@@ -470,9 +503,10 @@ Polling (no push in MVP): while any job of a visible meeting is `queued|running`
 
 **POST /v1/meetings/{id}/transcript/revisions** (correction)
 ```json
-{ "expected_revision": 1, "mutation_id": "uuid", "edits": [ { "segment_id": "s12", "text": "Budget naik 10 persen." } ] }
+{ "expected_revision": 1, "mutation_id": "uuid", "edits": [ { "segment_id": "s12", "text": "Budget naik 10 persen." } ],
+  "resolved_uncertain_segment_ids": ["s14"] }
 ```
-Creates revision `expected_revision+1`, kind `correction`, copying all segments and replacing text of edited ones (text ≤ 2000 chars, may be empty; unknown/duplicate segment id → `422 invalid_content`; ≥ 1 edit). Does not regenerate notes/MoM; they become stale. No quota. → `201 {"revision": TranscriptRevision}`; replayed `mutation_id` → `200`. `409 revision_conflict`.
+Creates revision `expected_revision+1`, kind `correction`, copying all segments (and the revision's `timing`) and replacing text of edited ones (text ≤ 2000 chars, may be empty; unknown/duplicate segment id → `422 invalid_content`). `resolved_uncertain_segment_ids` (optional) confirms segments as reviewed without changing their text (unknown/duplicate id → `422 invalid_content` at `/resolved_uncertain_segment_ids/<i>`). In the new revision `uncertain=false`, `uncertain_reason=null` for every segment whose text changed or that is listed; an edit that resends unchanged text resolves nothing by itself. At least one edit or one resolved id (`/edits` `too_short` otherwise). Does not regenerate notes/MoM; they become stale. No quota, no AI generation slot. → `201 {"revision": TranscriptRevision}`; replayed `mutation_id` → `200`. `409 revision_conflict`.
 
 ### 4.7 Documents
 
@@ -517,8 +551,8 @@ Header `Idempotency-Key`. Body:
 ```json
 { "language": null }
 ```
-`language` `id|en|null` (null = user language). Pins current transcript revision and current server manual notes revision (iOS pushes pending manual-notes edits first). → `202 {"job": Job}`; meeting → `generating_notes`. Success creates a new AI notes revision that becomes current (prior revisions, including user edits, remain restorable).
-Errors: `409 transcript_not_ready`, `409 job_in_progress`, `429 rate_limited`, `400 missing_idempotency_key`, `422 idempotency_key_reused`.
+`language` `id|en|null` (null = user language). Pins current transcript revision and current server manual notes revision (iOS pushes pending manual-notes edits first). → `202 {"job": Job}`; meeting (`transcript_ready`, `notes_failed` or `notes_ready`) → `generating_notes`. Success creates a new AI notes revision that becomes current (prior revisions, including user edits, remain restorable).
+Errors: `409 transcript_not_ready`, `409 job_in_progress`, `429 ai_generation_limit`, `400 missing_idempotency_key`, `422 idempotency_key_reused`.
 
 **POST /v1/meetings/{id}/documents/mom/generate** (create or regenerate)
 Header `Idempotency-Key`. Body:
@@ -526,10 +560,10 @@ Header `Idempotency-Key`. Body:
 { "ai_notes_revision_id": "uuid-or-null", "language": null }
 ```
 `ai_notes_revision_id` null = current AI notes revision; must belong to this meeting's AI notes. Pins it plus current transcript and manual notes revisions. → `202 {"job": Job}`. Success creates a new MoM revision (`origin: ai_generated`) that becomes current.
-Errors: `409 ai_notes_not_ready`, `404` unknown revision, `409 job_in_progress`, `429 rate_limited`.
+Errors: `409 ai_notes_not_ready`, `404` unknown revision, `409 job_in_progress`, `429 ai_generation_limit`.
 `manual_notes/generate` → `404`.
 
-Rate limit: user-triggered `generate_notes` + `generate_mom` jobs per user per rolling 24 h ≤ `AI_USER_JOBS_PER_DAY`. Idempotent replays do not count.
+AI generation slots (§4.10): every generate / regenerate (notes or MoM) reserves one slot in the same transaction as its job; `429 ai_generation_limit` when none is left (nothing stored for the key). Idempotent replays return the same job and slot; a second key while the job is active → `409 job_in_progress` (no slot). Retries reuse the slot; success consumes it; permanent failure or meeting deletion releases it. Generated transcript refs carry `approximate` from the pinned transcript revision's `timing` (§2 SourceRef).
 
 ### 4.8 Exports
 
@@ -568,10 +602,10 @@ Errors: `404` revision, `422 validation_failed`.
 {
   "entitlement": { "plan": "trial", "status": "active", "period_start": "…", "period_end": "…", "quota_seconds": 7200 },
   "consumed_seconds": 3601, "reserved_seconds": 0, "remaining_seconds": 3599,
-  "ai_generations": { "limit_per_day": 30, "used_last_24h": 2, "next_available_at": null }
+  "ai_generations": { "limit": 30, "window_hours": 24, "used": 2, "reserved": 1, "remaining": 27, "next_slot_at": null }
 }
 ```
-`status`: `active|expired|inactive`. `consumed_seconds` = current period; `reserved_seconds` = all in-flight reservations; `remaining_seconds = max(0, quota − consumed − reserved)`. `next_available_at`: when `used_last_24h ≥ limit_per_day`, the instant the oldest counted generation leaves the 24 h window; else `null`. UI shows minutes (floor). Recording/local save is never blocked by quota; iOS shows "Transcription waits for quota" on `402 quota_exceeded` and "Plan ended" on `402 entitlement_inactive`.
+`status`: `active|expired|inactive`. `consumed_seconds` = current period; `reserved_seconds` = all in-flight reservations; `remaining_seconds = max(0, quota − consumed − reserved)`. `ai_generations` (`AI_GENERATION_LIMIT`, default 30, per rolling `AI_GENERATION_WINDOW`, default 24 h): one slot per AI generation job — automatic notes (reserved at transcription start), user-requested notes generate/regenerate, MoM generate/regenerate. Counted = slots `reserved` or `consumed` whose reservation time is inside the window; `used` = consumed, `reserved` = in flight; `remaining = max(0, limit − used − reserved)`; `next_slot_at` (only when `remaining = 0`, else `null`) = when the oldest counted slot leaves the window (the earliest instant one more slot frees). Released slots (failure, deletion) never count. UI label id "30 generasi AI per 24 jam" / en "30 AI generations per 24 hours", "Sisa n" / "n left", and at 0 "Slot berikutnya tersedia <time>" / "Next slot available <time>". UI shows minutes (floor). Recording/local save is never blocked by quota; iOS shows "Transcription waits for quota" on `402 quota_exceeded` and "Plan ended" on `402 entitlement_inactive`.
 
 ### 4.11 Deletion
 
@@ -597,12 +631,12 @@ All four formats render the same fields from one revision; decisions, numbers, P
 
 Header (all formats): title (`meeting_info.title` for MoM; meeting title at export time for notes; empty → "Rapat tanpa judul"/"Untitled meeting"), date line `2026-11-06 09:00 WIB` (started_at in timezone, zone abbreviation from tzdata; null → "Tanggal belum ditentukan"/"Date not set"), participants line (MoM, if any), and Draft label "DRAFT — belum ditinjau"/"DRAFT — not reviewed" when draft. Label language = content `language` (manual notes: user language).
 
-Body order (MoM): agenda (numbered) then sections in stored order. Empty sections are omitted, except `decisions` and `action_items`, rendered as "Tidak ada."/"None.". Refs: transcript → `[mm:ss]` appended to the item (multiple: `[01:02, 05:40]`); user notes → "(dari catatan pengguna)"/"(from user notes)". No URLs, storage keys, ids, or tokens in any output. Origin indicators are not exported.
+Body order (MoM): agenda (numbered) then sections in stored order. Empty sections are omitted, except `decisions` and `action_items`, rendered as "Tidak ada."/"None.". Refs: transcript → `[mm:ss]` appended to the item (multiple: `[01:02, 05:40]`); approximate transcript refs → `[~mm:ss]` / `[~h:mm:ss]` (multiple: `[~01:02, ~1:02:05]`); user notes → "(dari catatan pengguna)"/"(from user notes)". When the output renders at least one approximate ref, it ends with one legend line in the label language: "~ = perkiraan waktu" / "~ = approximate time" (md/docx: last paragraph; pdf: last block). Exact refs and outputs without approximate refs are unchanged (no legend). Transcript uncertainty (`uncertain` segments) is never exported. No URLs, storage keys, ids, or tokens in any output. Origin indicators are not exported.
 
-- **md**: `#` title, `##` sections, `###` topics; `-` bullets, `1.` numbered; paragraph style = blank-line paragraphs; action items as table `| No | Tugas/Task | PIC | Deadline | Sumber/Source |`. Escape `\ * _ \` [ ] < > |` with backslash; escape leading `#`, `+`, `-`, `N.` at line starts; newlines in cells → space; trailing newline. Byte-identical for identical input.
-- **whatsapp**: `*Title*`, date line, `_DRAFT…_`, then `*Ringkasan*` (summary), `*Keputusan*` (numbered), `*Action items*` (numbered; second line `   PIC: … · Deadline: …`). No other sections, no refs. Byte-identical.
-- **docx**: Title + Heading1/Heading2/Heading3 styles, native numbering (`numbering.xml`; each numbered list restarts), action items as a 5-column table with header row; header line paragraph "DRAFT" when draft. Deterministic zip (fixed entry order, fixed timestamp = revision `created_at`).
-- **pdf**: A4, 20 mm margins, embedded UTF-8 TTF (regular+bold), headings 18/14/12 pt, body 11 pt, wrapped text (no clipped lines across page breaks), action items as numbered blocks with PIC/Deadline/Source line, "DRAFT" in page header when draft, footer `n/N`, selectable text. Creation/modification dates = revision `created_at`.
+- **md**: `#` title, `##` sections, `###` topics; `-` bullets, `1.` numbered; paragraph style = blank-line paragraphs; action items as table `| No | Tugas/Task | PIC | Deadline | Sumber/Source |`. Escape `\ * _ \` [ ] < > |` with backslash; escape leading `#`, `+`, `-`, `N.` at line starts; `~` in refs and the legend is written `\~` (no GFM strikethrough); newlines in cells → space; trailing newline. Byte-identical for identical input.
+- **whatsapp**: `*Title*`, date line, `_DRAFT…_`, then `*Ringkasan*` (summary), `*Keputusan*` (numbered), `*Action items*` (numbered; second line `   PIC: … · Deadline: …`). No other sections, no refs, so never the `~` legend. Byte-identical.
+- **docx**: Title + Heading1/Heading2/Heading3 styles, native numbering (`numbering.xml`; each numbered list restarts), action items as a 5-column table with header row; header line paragraph "DRAFT" when draft. Fonts are not embedded: `styles.xml` defaults to `Noto Sans` (`ascii/hAnsi/eastAsia/cs`); runs with runes only DejaVu Sans covers set `w:rFonts` to `DejaVu Sans`; machines without these fonts substitute. Deterministic zip (fixed entry order, fixed timestamp = revision `created_at`).
+- **pdf**: A4, 20 mm margins, embedded UTF-8 TTF subsets: Noto Sans regular+bold, with per-rune fallback to DejaVu Sans regular+bold (embedded only when used) for runes Noto Sans lacks (`backend/internal/export/fonts/README.md`); runes above U+FFFF → `?`; headings 18/14/12 pt, body 11 pt, wrapped text (no clipped lines across page breaks), action items as numbered blocks with PIC/Deadline/Source line, "DRAFT" in page header when draft, footer `n/N`, selectable text. Creation/modification dates = revision `created_at`.
 
 Filename: `{slug}-{yyyymmdd}-{mom|notes|manual-notes}[-draft].{md|txt|docx|pdf}`; slug = ASCII lowercase `[a-z0-9-]` from title, ≤ 60 chars, fallback `meeting`; date from started_at in meeting timezone, else `undated`.
 
@@ -611,7 +645,7 @@ Filename: `{slug}-{yyyymmdd}-{mom|notes|manual-notes}[-draft].{md|txt|docx|pdf}`
 1. Create meeting (and any new folder/tag) locally with client UUIDs; record/import; autosave manual notes locally.
 2. When online: `POST /v1/meetings` (with `id`) → `PUT …/documents/manual_notes` (`expected_revision` from last server revision, 0 initially).
 3. `POST …/uploads` (with `transcription` = the persisted transcribe intent key) → `PUT` chunks; the last one verifies and starts transcription → `POST …/complete` (confirm, idempotent).
-4. `POST …/transcription` with the same `Idempotency-Key` and body → `200` replay, or `402` → keep meeting in "waiting for quota" / "plan ended" and retry when `/v1/usage` shows an active entitlement with enough quota.
+4. `POST …/transcription` with the same `Idempotency-Key` and body → `200` replay, or `402` → keep meeting in "waiting for quota" / "plan ended" and retry when `/v1/usage` shows an active entitlement with enough quota, or `429 ai_generation_limit` (also signalled by the upload completion's `transcription_blocked`) → ask the user: wait for the AI slot (retry the same intent after `next_slot_at`) or transcribe only (`notes: "skip"`, new key). Never pick automatically.
 5. Poll per 4.5; fetch transcript and AI notes on change. MoM only on user action.
 
 Every step is safely retryable: meeting/folder/tag create by id, writes by `mutation_id` (same body), uploads by offset, jobs by idempotency key.

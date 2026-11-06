@@ -142,6 +142,7 @@ Short points (api §3.1 manual-notes items): a `TextField` "Tambah poin…"; Ret
 | rec.stopped.next.upload | Mengunggah untuk transkripsi… | Uploading for transcription… |
 | rec.stopped.next.offline | Menunggu koneksi untuk mengunggah. | Waiting for connection to upload. |
 | rec.stopped.next.quota | Transkripsi menunggu kuota tersedia. | Transcription waits until quota is available. |
+| rec.stopped.next.aiSlot | Slot AI sedang habis. Setelah upload, Anda bisa menunggu slot atau transkrip saja. | No AI slot is left right now. After upload you can wait for one or transcribe only. |
 | rec.stopped.open | Buka meeting | Open meeting |
 | rec.notes.label | Catatan | Notes |
 | rec.notes.placeholder | Tambah poin… | Add a point… |

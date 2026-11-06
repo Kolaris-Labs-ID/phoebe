@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"io"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 
@@ -15,8 +16,10 @@ import (
 	"phoebe/internal/events"
 	"phoebe/internal/ids"
 	"phoebe/internal/jobs"
+	"phoebe/internal/jsonx"
 	"phoebe/internal/meetings"
 	"phoebe/internal/storage"
+	"phoebe/internal/transcripts"
 )
 
 var audioTypes = []string{audio.M4A, audio.MP3, audio.WAV}
@@ -91,11 +94,18 @@ func (s *Service) storedResult(ctx context.Context, q db.Querier, x *session) (*
 	if err != nil {
 		return nil, err
 	}
-	j, err := meetings.LatestJob(ctx, q, x.MeetingID, jobs.TypeTranscribe)
-	if err != nil {
-		return nil, err
+	res := &Result{Upload: x.view(s.cfg.UploadChunkMaxBytes), Audio: a}
+	if x.TranscribeJobID != nil {
+		j, err := jobs.Get(ctx, q, *x.TranscribeJobID)
+		if err != nil {
+			return nil, err
+		}
+		res.Job = meetings.JobView(j)
 	}
-	return &Result{Upload: x.view(s.cfg.UploadChunkMaxBytes), Audio: a, Job: j}, nil
+	if x.BlockedCode != nil {
+		res.TranscriptionBlocked = &Blocked{Code: apperr.Code(*x.BlockedCode), NextSlotAt: jsonx.TimePtr(x.BlockedNextSlotAt)}
+	}
+	return res, nil
 }
 
 // verify checks the received bytes under the verify lease. verr is the client-visible
@@ -209,6 +219,7 @@ func (s *Service) fail(ctx context.Context, x *session, lease string, verr error
 func (s *Service) finalize(ctx context.Context, x *session, lease, ct string, durationMS int64, final string) (*Result, error) {
 	assetID := ids.New()
 	var job *jobs.Job
+	var blocked *Blocked
 	err := db.InTx(ctx, s.pool, func(tx pgx.Tx) error {
 		if err := db.LockMeeting(ctx, tx, x.MeetingID, x.UserID); err != nil {
 			return err
@@ -237,11 +248,10 @@ func (s *Service) finalize(ctx context.Context, x *session, lease, ct string, du
 			return err
 		}
 		if x.TranscribeKey != nil && s.starter != nil {
-			j, err := s.autoStart(ctx, tx, x)
-			if err != nil {
+			var err error
+			if job, blocked, err = s.autoStart(ctx, tx, x); err != nil {
 				return err
 			}
-			job = j
 		}
 		return db.TouchMeeting(ctx, tx, x.MeetingID)
 	})
@@ -261,15 +271,45 @@ func (s *Service) finalize(ctx context.Context, x *session, lease, ct string, du
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Upload: done.view(s.cfg.UploadChunkMaxBytes), Audio: a, Job: meetings.JobView(job)}, nil
+	return &Result{Upload: done.view(s.cfg.UploadChunkMaxBytes), Audio: a, Job: meetings.JobView(job), TranscriptionBlocked: blocked}, nil
 }
 
-// autoStart swallows refusals (402 quota, 409, …): the meeting stays uploaded with job
-// null, and iOS's explicit POST …/transcription gets the reason.
-func (s *Service) autoStart(ctx context.Context, tx pgx.Tx, x *session) (*jobs.Job, error) {
-	j, _, err := s.starter.StartInTx(ctx, tx, x.UserID, x.MeetingID, *x.TranscribeKey, *x.TranscribeLang)
-	if apperr.CodeOf(err) != "" {
-		return nil, nil
+// autoStart swallows refusals (402 quota, 409, 429, …): the meeting stays uploaded with job
+// null, and iOS's explicit POST …/transcription gets the reason. A missing AI generation slot
+// is reported as transcription_blocked so the app can offer wait / transcribe-only before reserving minutes.
+func (s *Service) autoStart(ctx context.Context, tx pgx.Tx, x *session) (*jobs.Job, *Blocked, error) {
+	notes := transcripts.NotesAuto
+	if x.TranscribeNotes != nil {
+		notes = *x.TranscribeNotes
 	}
-	return j, err
+	j, _, err := s.starter.StartInTx(ctx, tx, x.UserID, x.MeetingID, *x.TranscribeKey, *x.TranscribeLang, notes)
+	var blocked *Blocked
+	var ae *apperr.Error
+	if errors.As(err, &ae) {
+		j, err = nil, nil
+		if ae.Code == apperr.AIGenerationLimit {
+			next, _ := ae.Details["next_slot_at"].(*jsonx.Time)
+			blocked = &Blocked{Code: ae.Code, NextSlotAt: next}
+		}
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	var jobID, code *string
+	var next *time.Time
+	if j != nil {
+		jobID = &j.ID
+	}
+	if blocked != nil {
+		c := string(blocked.Code)
+		code = &c
+		if blocked.NextSlotAt != nil {
+			next = &blocked.NextSlotAt.Time
+		}
+	}
+	if _, err := tx.Exec(ctx, `UPDATE upload_sessions SET transcribe_job_id = $2, transcription_blocked = $3,
+		transcription_blocked_next_slot_at = $4 WHERE id = $1`, x.ID, jobID, code, next); err != nil {
+		return nil, nil, err
+	}
+	return j, blocked, nil
 }

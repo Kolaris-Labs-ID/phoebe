@@ -19,8 +19,8 @@ type STT interface {
 	Transcribe(ctx context.Context, in STTInput) (STTResult, error)
 }
 
-// DurationMS is the server-validated duration of the audio in Reader; real adapters ignore it,
-// the fake derives its segments from it.
+// DurationMS is the server-validated duration of the audio in Reader: real adapters plan chunk
+// windows and silence coverage from it, the fake derives its segments from it.
 type STTInput struct {
 	Reader      io.Reader
 	Filename    string
@@ -29,16 +29,46 @@ type STTInput struct {
 	DurationMS  int64
 }
 
-type RawSegment struct {
-	StartSec, EndSec                           float64
-	Text                                       string
-	NoSpeechProb, AvgLogprob, CompressionRatio float64
+// TimingChunk times are our silence-aligned chunk bounds, so they are only approximate.
+const (
+	TimingSegment = "segment"
+	TimingChunk   = "chunk"
+)
+
+const UncertainLowConfidence = "low_confidence"
+
+// Times are absolute in the input audio, not relative to a chunk.
+type Segment struct {
+	StartMS, EndMS  int64
+	Text            string
+	Uncertain       bool
+	UncertainReason string
 }
 
+// AudioMS counts only audio sent to the provider: skipped silent chunks are not billed.
 type STTResult struct {
 	Language string
-	Segments []RawSegment
+	Timing   string
+	Segments []Segment
 	AudioMS  int64
+}
+
+type Task string
+
+const (
+	TaskNotes Task = "notes"
+	TaskMoM   Task = "mom"
+)
+
+type taskKey struct{}
+
+func WithTask(ctx context.Context, t Task) context.Context {
+	return context.WithValue(ctx, taskKey{}, t)
+}
+
+func TaskOf(ctx context.Context) Task {
+	t, _ := ctx.Value(taskKey{}).(Task)
+	return t
 }
 
 type LLM interface {

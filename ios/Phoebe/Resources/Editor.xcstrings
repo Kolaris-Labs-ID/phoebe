@@ -262,13 +262,13 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Regenerate limit reached. Try again %@."
+            "value": "AI generation limit reached. Next slot available %@."
           }
         },
         "id": {
           "stringUnit": {
             "state": "translated",
-            "value": "Batas pembuatan ulang tercapai. Coba lagi %@."
+            "value": "Batas generasi AI tercapai. Slot berikutnya tersedia %@."
           }
         }
       }

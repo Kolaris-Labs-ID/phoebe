@@ -159,9 +159,7 @@ struct SettingsView: View {
                         Text(L("settings.plan.until", table: .settings))
                     }
                 }
-                Text(L("settings.ai.limit", table: .settings, Int64(usage.aiGenerations.usedLast24h), Int64(usage.aiGenerations.limitPerDay)))
-                    .font(Typography.subheadline)
-                    .foregroundStyle(Palette.textPrimary)
+                AIAllowanceRow(allowance: AIAllowance(usage.aiGenerations))
             } header: {
                 Text(L("settings.plan", table: .settings))
             } footer: {
@@ -367,7 +365,32 @@ private extension UsageDTO {
         UsageDTO(
             entitlement: EntitlementDTO(plan: "trial", status: .active, periodStart: nil, periodEnd: .now, quotaSeconds: 7200),
             consumedSeconds: 2520, reservedSeconds: 0, remainingSeconds: 4680,
-            aiGenerations: AIGenerationsDTO(limitPerDay: 30, usedLast24h: 0, nextAvailableAt: nil)
+            aiGenerations: AIGenerationsDTO(limit: 30, windowHours: 24, used: 0, reserved: 0, remaining: 30, nextSlotAt: nil)
         )
+    }
+}
+
+private struct AIAllowanceRow: View {
+    let allowance: AIAllowance
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.xs) {
+            LabeledContent {
+                Text(verbatim: allowance.remainingText())
+                    .monospacedDigit()
+            } label: {
+                Label { Text(verbatim: allowance.label()) } icon: { Image(systemName: "sparkles") }
+            }
+            .labeledContentStyle(AdaptiveLabeledContentStyle())
+            if let next = allowance.nextSlotText() {
+                Label { Text(verbatim: next) } icon: { Image(systemName: "hourglass") }
+                    .font(Typography.footnote)
+                    .foregroundStyle(Palette.textSecondary)
+            }
+            Text(L("ai.allowance.footnote", table: .settings))
+                .font(Typography.footnote)
+                .foregroundStyle(Palette.textSecondary)
+        }
+        .accessibilityElement(children: .combine)
     }
 }

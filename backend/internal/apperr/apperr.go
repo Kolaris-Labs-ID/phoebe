@@ -1,10 +1,6 @@
 package apperr
 
-import (
-	"errors"
-	"math"
-	"time"
-)
+import "errors"
 
 type Code string
 
@@ -13,6 +9,9 @@ const (
 	InvalidJSON           Code = "invalid_json"
 	MissingIdempotencyKey Code = "missing_idempotency_key"
 	Unauthenticated       Code = "unauthenticated"
+	AccessTokenExpired    Code = "access_token_expired"
+	SessionRevoked        Code = "session_revoked"
+	SessionExpired        Code = "session_expired"
 	QuotaExceeded         Code = "quota_exceeded"
 	EntitlementInactive   Code = "entitlement_inactive"
 	InvalidSignature      Code = "invalid_signature"
@@ -46,7 +45,7 @@ const (
 	AudioCorrupt          Code = "audio_corrupt"
 	AudioEmpty            Code = "audio_empty"
 	AudioTooLong          Code = "audio_too_long"
-	RateLimited           Code = "rate_limited"
+	AIGenerationLimit     Code = "ai_generation_limit"
 	Internal              Code = "internal"
 	Unavailable           Code = "unavailable"
 )
@@ -100,14 +99,6 @@ func Field(field, reason string) *Error {
 // path is a JSON pointer into the submitted content.
 func Content(path, reason string) *Error {
 	return &Error{Code: InvalidContent, Details: map[string]any{"path": path, "reason": reason}}
-}
-
-func RateLimit(retryAfter time.Duration) *Error {
-	secs := int64(math.Ceil(retryAfter.Seconds()))
-	if secs < 1 {
-		secs = 1
-	}
-	return &Error{Code: RateLimited, Details: map[string]any{"retry_after_seconds": secs}}
 }
 
 func CodeOf(err error) Code {

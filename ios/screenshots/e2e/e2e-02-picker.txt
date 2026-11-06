@@ -1,78 +1,138 @@
-Optional(Attributes: Application, 0x112e07330, pid: 72849, label: 'Phoebe'
+Optional(Attributes: Application, 0x122c05050, pid: 35953, label: 'Phoebe'
 Element subtree:
- →Application, 0x112e07330, pid: 72849, label: 'Phoebe'
-    Window (Main), 0x112e05a30, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x112e079d0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x112e080c0, {{16.0, 59.0}, {361.0, 782.6}}
-          Other, 0x112e06840, {{-345.0, -723.6}, {1083.0, 2347.9}}
-          Other, 0x112e06f60, {{16.0, 59.0}, {361.0, 782.6}}
-            Other, 0x10401e700, {{16.0, 59.0}, {361.0, 782.6}}
-              Other, 0x10460a770, {{16.0, 59.0}, {361.0, 782.6}}
-                NavigationBar, 0x10460a420, {{16.0, 108.3}, {361.0, 135.9}}, identifier: 'Meeting'
-                  Other, 0x10460a090, {{30.7, 108.3}, {40.4, 40.4}}, identifier: 'gearshape', label: 'Pengaturan'
-                    Other, 0x104311d50, {{30.7, 108.3}, {40.4, 40.4}}
-                      Button, 0x10681cab0, {{30.7, 108.3}, {40.4, 40.4}}, identifier: 'gearshape', label: 'Pengaturan'
-                  Other, 0x106821ac0, {{274.1, 108.3}, {40.4, 40.4}}, label: 'Filter'
-                    Other, 0x104706080, {{274.1, 108.3}, {40.4, 40.4}}
-                      Button, 0x106822960, {{274.1, 108.3}, {40.4, 40.4}}, label: 'Filter'
-                        Button, 0x106822d80, {{275.0, 108.3}, {38.6, 40.4}}
-                          Other, 0x112808570, {{275.0, 108.3}, {38.6, 40.4}}
-                            Image, 0x106822ea0, {{275.0, 108.3}, {38.6, 40.4}}, identifier: 'line.3.horizontal.decrease.circle', label: 'Filter'
-                  Other, 0x106822fc0, {{321.9, 108.3}, {40.4, 40.4}}, label: 'Tambah'
-                    Other, 0x1068230e0, {{321.9, 108.3}, {40.4, 40.4}}
-                      Button, 0x106823200, {{321.9, 108.3}, {40.4, 40.4}}, label: 'Tambah'
-                        Button, 0x10691b740, {{327.7, 108.3}, {28.8, 40.4}}
-                          Other, 0x10691b080, {{327.7, 108.3}, {28.8, 40.4}}
-                            Image, 0x11290a1e0, {{327.7, 108.3}, {28.8, 40.4}}, identifier: 'plus', label: 'Tambah'
-                  StaticText, 0x11290a8e0, {{30.7, 152.1}, {119.4, 37.4}}, label: 'Meeting'
-                  SearchField, 0x10460aae0, {{30.7, 197.4}, {331.6, 33.1}}, label: 'Cari judul, tag, atau isi', placeholderValue: 'Cari judul, tag, atau isi'
-                    Image, 0x104218a10, {{36.2, 205.1}, {18.7, 17.1}}, identifier: 'magnifyingglass', label: 'Cari'
-                Other, 0x112e087a0, {{16.0, 59.0}, {361.0, 782.6}}
-                  Other, 0x11290afe0, {{16.0, 59.0}, {361.0, 782.6}}
-                    Other, 0x1043129f0, {{16.0, 59.0}, {361.0, 782.6}}
-                      Other, 0x104312c50, {{16.0, 59.0}, {361.0, 782.6}}
-                        CollectionView, 0x104312d70, {{16.0, 59.0}, {361.0, 782.6}}
-                          Other, 0x104312e90, {{-2.4, -1321.0}, {397.7, 3488.7}}
-                          Cell, 0x104312fb0, {{34.4, 244.2}, {324.3, 339.9}}
-                            Other, 0x1043130d0, {{34.4, 244.2}, {324.3, 339.9}}
-                              Other, 0x1043131f0, {{34.4, 244.2}, {324.3, 339.9}}
-                                Other, 0x106a139e0, {{34.4, 244.2}, {324.3, 339.9}}
-                            Other, 0x106a11660, {{34.4, 244.2}, {324.3, 339.9}}
-                              Other, 0x106a12450, {{34.4, 244.2}, {324.3, 339.9}}
-                                Other, 0x106a12f10, {{34.4, 244.2}, {324.3, 339.9}}
-                                  Image, 0x112f11170, {{176.4, 272.1}, {53.6, 47.8}}, identifier: 'waveform.badge.plus', label: 'waveform.badge.plus'
-                                  StaticText, 0x112f145e0, {{106.2, 272.1}, {180.7, 88.8}}, label: 'Belum ada meeting'
-                                  StaticText, 0x112f14160, {{82.9, 363.7}, {227.2, 53.3}}, label: 'Rekam meeting atau impor file audio untuk membuat transkrip dan MoM.'
-                                  Button, 0x112f14a00, {{134.8, 435.3}, {123.4, 55.1}}, label: 'Rekam'
-                                    Image, 0x112f14b20, {{154.1, 452.8}, {20.5, 20.5}}, identifier: 'record.circle', label: 'Perekaman Layar'
-                                    StaticText, 0x112f14c40, {{134.8, 435.3}, {123.4, 55.1}}, label: 'Rekam'
-                                  Button, 0x112f14d60, {{134.8, 511.6}, {123.4, 40.4}}, label: 'Impor audio'
-                                    Image, 0x112f14e80, {{140.0, 522.0}, {15.3, 19.9}}, identifier: 'square.and.arrow.down', label: 'Unduh'
-                                    StaticText, 0x112f14fa0, {{134.8, 520.4}, {123.4, 23.0}}, label: 'Impor audio'
-                          Other, 0x112f150c0, {{346.7, 201.4}, {27.6, 528.2}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
-                            Other, 0x112f151e0, {{371.5, 331.2}, {2.8, 395.6}}
-                          Other, 0x112f15300, {{346.7, 201.4}, {27.6, 528.2}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
-                            Other, 0x112f15420, {{371.5, 331.2}, {2.8, 395.6}}
-                        Button, 0x112f15540, {{30.7, 744.3}, {331.6, 58.8}}, label: 'Rekam'
-                          Image, 0x112f15660, {{160.2, 766.0}, {15.9, 15.9}}, identifier: 'record.circle', label: 'Perekaman Layar'
-                          StaticText, 0x10451a9e0, {{30.7, 744.3}, {331.6, 58.8}}, label: 'Rekam'
-      Other, 0x10451b240, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x10451b360, {{-393.0, -852.0}, {1179.0, 2556.0}}
-        Other, 0x10451b480, {{0.0, 69.0}, {393.0, 783.0}}
-          Other, 0x10451b5a0, {{0.0, 69.0}, {393.0, 783.0}}
-            Other, 0x10451b6c0, {{0.0, 69.0}, {393.0, 783.0}}
-              Other, 0x10451b7e0, {{0.0, 69.0}, {393.0, 783.0}}
-                Other, 0x10451b900, {{0.0, 69.0}, {393.0, 783.0}}
-                  Other, 0x10451ba20, {{0.0, 69.0}, {393.0, 783.0}}
-    Window, 0x112a07410, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x11290b6e0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x104313310, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x112f15780, {{0.0, 852.0}, {393.0, 233.0}}
+ →Application, 0x122c05050, pid: 35953, label: 'Phoebe'
+    Window (Main), 0x122c05170, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10763ae70, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107637240, {{20.0, 62.0}, {400.0, 869.1}}
+          Other, 0x107639190, {{-380.0, -807.1}, {1200.0, 2607.3}}
+          Other, 0x1076394d0, {{20.0, 62.0}, {400.0, 869.1}}
+            Other, 0x107504360, {{20.0, 62.0}, {400.0, 869.1}}
+              Other, 0x107504480, {{20.0, 62.0}, {400.0, 869.1}}
+                NavigationBar, 0x10763b560, {{20.0, 113.2}, {400.0, 134.5}}, identifier: 'Meeting'
+                  Other, 0x107639bc0, {{38.2, 113.2}, {40.0, 40.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                    Other, 0x10763b1d0, {{38.2, 113.2}, {40.0, 40.0}}
+                      Button, 0x10763a600, {{38.2, 113.2}, {40.0, 40.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                  Other, 0x10a122da0, {{314.5, 113.2}, {40.0, 40.0}}, label: 'Filter'
+                    Other, 0x10a133940, {{314.5, 113.2}, {40.0, 40.0}}
+                      Button, 0x10a721d70, {{314.5, 113.2}, {40.0, 40.0}}, label: 'Filter'
+                        Button, 0x10a7212f0, {{315.5, 113.2}, {38.2, 40.0}}
+                          Other, 0x10a724390, {{315.5, 113.2}, {38.2, 40.0}}
+                            Image, 0x10a724f70, {{315.5, 113.2}, {38.2, 40.0}}, identifier: 'line.3.horizontal.decrease.circle', label: 'Filter'
+                  Other, 0x10a725090, {{361.8, 113.2}, {40.0, 40.0}}, label: 'Tambah'
+                    Other, 0x10c01e2c0, {{361.8, 113.2}, {40.0, 40.0}}
+                      Button, 0x10c01c700, {{361.8, 113.2}, {40.0, 40.0}}, label: 'Tambah'
+                        Button, 0x10c0177f0, {{367.6, 113.2}, {28.5, 40.0}}
+                          Other, 0x10c01e9c0, {{367.6, 113.2}, {28.5, 40.0}}
+                            Image, 0x10c01eae0, {{367.6, 113.2}, {28.5, 40.0}}, identifier: 'plus', label: 'Tambah'
+                  StaticText, 0x10c017a80, {{38.2, 156.5}, {118.2, 37.0}}, label: 'Meeting'
+                  SearchField, 0x10c017ba0, {{38.2, 201.4}, {363.6, 32.7}}, label: 'Cari judul, tag, atau isi', placeholderValue: 'Cari judul, tag, atau isi'
+                    Image, 0x10c017cc0, {{43.6, 209.0}, {18.5, 17.0}}, identifier: 'magnifyingglass', label: 'Cari'
+                Other, 0x10c0180f0, {{20.0, 62.0}, {400.0, 869.1}}
+                  Other, 0x10c018210, {{20.0, 62.0}, {400.0, 869.1}}
+                    Other, 0x10c018330, {{20.0, 62.0}, {400.0, 869.1}}
+                      Other, 0x10c018450, {{20.0, 62.0}, {400.0, 869.1}}
+                        CollectionView, 0x10763b8e0, {{20.0, 62.0}, {400.0, 869.1}}
+                          Other, 0x10763a2a0, {{1.8, -1490.4}, {436.4, 3812.7}}
+                          Cell, 0x107638dc0, {{38.2, 247.8}, {363.6, 318.2}}
+                            Other, 0x107639820, {{38.2, 247.8}, {363.6, 318.2}}
+                              Other, 0x107639f40, {{38.2, 247.8}, {363.6, 318.2}}
+                                Other, 0x107637590, {{38.2, 247.8}, {363.6, 318.2}}
+                            Other, 0x10a6050f0, {{38.2, 247.8}, {363.6, 318.2}}
+                              Other, 0x10721d730, {{38.2, 247.8}, {363.6, 318.2}}
+                                Other, 0x107638a70, {{38.2, 247.8}, {363.6, 318.2}}
+                                  Image, 0x10a7251b0, {{200.3, 275.3}, {53.0, 47.3}}, identifier: 'waveform.badge.plus', label: 'waveform.badge.plus'
+                                  StaticText, 0x10a725400, {{130.6, 275.3}, {178.8, 87.9}}, label: 'Belum ada meeting'
+                                  StaticText, 0x10a725520, {{85.5, 365.9}, {269.1, 34.5}}, label: 'Rekam meeting atau impor file audio untuk membuat transkrip dan MoM.'
+                                  Button, 0x10a725640, {{159.1, 418.7}, {122.1, 54.5}}, label: 'Rekam'
+                                    Image, 0x10a725760, {{178.2, 435.9}, {20.3, 20.3}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                                    StaticText, 0x10a725880, {{159.1, 418.7}, {122.1, 54.5}}, label: 'Rekam'
+                                  Button, 0x10a7259a0, {{159.1, 494.1}, {122.1, 40.0}}, label: 'Impor audio'
+                                    Image, 0x10a725ac0, {{164.2, 504.4}, {15.2, 19.7}}, identifier: 'square.and.arrow.down', label: 'Unduh'
+                                    StaticText, 0x10a725be0, {{159.1, 502.9}, {122.1, 22.7}}, label: 'Impor audio'
+                          Other, 0x10a725d00, {{390.0, 205.6}, {27.3, 614.5}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10a725e20, {{414.5, 444.4}, {2.7, 373.0}}
+                          Other, 0x10a725f40, {{390.0, 205.6}, {27.3, 614.5}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10a726060, {{414.5, 444.4}, {2.7, 373.0}}
+                        Button, 0x10a726180, {{34.5, 834.7}, {370.9, 58.2}}, label: 'Rekam'
+                          Image, 0x10a7262a0, {{183.9, 856.2}, {15.8, 15.8}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                          StaticText, 0x10a7263c0, {{34.5, 834.7}, {370.9, 58.2}}, label: 'Rekam'
+      Other, 0x10a7264e0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10a726600, {{-440.0, -956.0}, {1320.0, 2868.0}}
+        Other, 0x10a726720, {{0.0, 0.0}, {440.0, 956.0}}
+          Other, 0x10a726840, {{0.0, 0.0}, {440.0, 956.0}}
+            Other, 0x10a726960, {{0.0, 0.0}, {440.0, 956.0}}
+              Other, 0x10a726a80, {{0.0, 0.0}, {440.0, 956.0}}
+                Other, 0x10a726ba0, {{0.0, 0.0}, {440.0, 956.0}}
+                  Other, 0x10a726cc0, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x10a726de0, {{340.0, 72.0}, {1.0, 56.0}}, label: 'Batalkan'
+                  Other, 0x10a726f00, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x10a727020, {{0.0, 0.0}, {440.0, 956.0}}
+                      Other, 0x10a727140, {{0.0, 0.0}, {440.0, 956.0}}
+                        Other, 0x10a727260, {{0.0, 0.0}, {440.0, 956.0}}
+                          Other, 0x10a727380, {{0.0, 72.0}, {440.0, 884.0}}
+                            Image, 0x10a7274a0, {{-150.0, -78.0}, {740.0, 1184.0}}
+                            Other, 0x10a7275c0, {{0.0, 72.0}, {440.0, 884.0}}
+                              Other, 0x10a7276e0, {{0.0, 72.0}, {440.0, 884.0}}
+                                Other, 0x10a727800, {{0.0, 72.0}, {440.0, 884.0}}
+                                  Other, 0x10a727920, {{0.0, 72.0}, {440.0, 884.0}}
+                                    Other, 0x10a727a40, {{0.0, 72.0}, {440.0, 884.0}}
+                                      Other, 0x10a727b60, {{0.0, 72.0}, {440.0, 884.0}}
+                                      Other, 0x10a727c80, {{0.0, 72.0}, {440.0, 884.0}}
+                                        Other, 0x10a727da0, {{0.0, 72.0}, {440.0, 884.0}}
+                                          Other, 0x10a727ec0, {{0.0, 72.0}, {440.0, 884.0}}
+                                            Other, 0x10a727fe0, {{0.0, 72.0}, {440.0, 884.0}}, identifier: 'Browse View (Picker)'
+                                              Other, 0x10a728100, {{0.0, 72.0}, {440.0, 884.0}}
+                                                Other, 0x10a728220, {{0.0, 72.0}, {440.0, 884.0}}
+                                                  Other, 0x10a728340, {{0.0, 72.0}, {440.0, 884.0}}
+                                                  Other, 0x10a728460, {{0.0, 72.0}, {440.0, 884.0}}, identifier: 'DOC.browsingRoot Source: com.apple.FileProvider.LocalStorage, Title: Di iPhone Saya'
+                                                    NavigationBar, 0x10a728580, {{0.0, 72.0}, {440.0, 108.0}}, identifier: 'FullDocumentManagerViewControllerNavigationBar'
+                                                      Button, 0x10a7286a0, {{0.0, 78.0}, {93.7, 44.0}}, label: 'Telusuri'
+                                                      StaticText, 0x10a7287c0, {{161.3, 89.7}, {117.3, 20.3}}, label: 'Di iPhone Saya'
+                                                      Button, 0x10a7288e0, {{307.0, 78.0}, {68.3, 44.0}}, label: 'Batalkan'
+                                                      Button, 0x10a728a00, {{383.3, 78.0}, {44.7, 44.0}}, label: 'Lainnya'
+                                                      SearchField, 0x10a728b20, {{20.0, 129.0}, {400.0, 36.0}}, label: 'Cari', placeholderValue: 'Cari'
+                                                        Image, 0x10a728c40, {{26.0, 137.3}, {20.3, 18.7}}, identifier: 'magnifyingglass', label: 'Cari'
+                                                    Other, 0x10a728d60, {{0.0, 72.0}, {440.0, 884.0}}
+                                                      Other, 0x10a728e80, {{0.0, 72.0}, {440.0, 884.0}}
+                                                        Other, 0x10a728fa0, {{0.0, 72.0}, {440.0, 884.0}}
+                                                          Other, 0x10a7290c0, {{0.0, 72.0}, {440.0, 884.0}}
+                                                            CollectionView, 0x10a7291e0, {{0.0, 72.0}, {440.0, 884.0}}, identifier: 'File View', value: Icon Mode
+                                                              Cell, 0x10a729300, {{10.0, 190.0}, {134.7, 189.0}}, identifier: 'RapatUjiE2E, m4a', label: 'RapatUjiE2E, m4a, 10.02, 165 KB'
+                                                                Other, 0x10a729420, {{10.0, 190.0}, {134.7, 189.0}}
+                                                                Other, 0x10a729540, {{10.0, 190.0}, {134.7, 189.0}}
+                                                                  Other, 0x10a729660, {{35.3, 194.0}, {84.0, 84.0}}
+                                                                    Image, 0x10a729780, {{35.3, 194.0}, {84.0, 84.0}}
+                                                                  Other, 0x10a7298a0, {{13.0, 283.0}, {128.7, 55.7}}
+                                                                    StaticText, 0x10a7299c0, {{13.0, 283.0}, {128.7, 20.0}}, label: 'RapatUjiE2E'
+                                                                    StaticText, 0x10a729ae0, {{13.0, 306.0}, {128.7, 14.3}}, label: '10.02'
+                                                                    StaticText, 0x10a729c00, {{13.0, 324.3}, {128.7, 14.3}}, label: '165 KB'
+                                                              Other, 0x10a729d20, {{0.0, 835.0}, {440.0, 38.0}}
+                                                                Other, 0x10a729e40, {{0.0, 835.0}, {440.0, 38.0}}, identifier: 'DOCItemCollectionViewFooterViewIdentifier'
+                                                                  StaticText, 0x10a729f60, {{198.3, 835.0}, {43.7, 18.0}}, label: '1 item'
+                                                              Other, 0x10a72a080, {{407.0, 180.0}, {30.0, 693.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                                                                Other, 0x10a72a1a0, {{434.0, 183.0}, {3.0, 687.0}}
+                                                              Other, 0x10a72a2c0, {{407.0, 180.0}, {30.0, 693.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                                                                Other, 0x10a72a3e0, {{434.0, 183.0}, {3.0, 687.0}}
+                                        TabBar, 0x10c018570, {{0.0, 873.0}, {440.0, 83.0}}, identifier: 'DOC.browsingModeTabBar', label: 'Bar Tab'
+                                          Button, 0x10c018690, {{2.0, 874.0}, {143.0, 48.0}}, label: 'Terbaru'
+                                          Button, 0x10c0187b0, {{149.0, 874.0}, {142.0, 48.0}}, label: 'Bersama'
+                                          Button, 0x10c0188d0, {{295.0, 874.0}, {143.0, 48.0}}, label: 'Telusuri', Selected
+                                            Image, 0x10c0189f0, {{350.3, 879.0}, {32.0, 25.0}}, identifier: 'folder.fill', label: 'pindahkan'
+    Window, 0x10c018b10, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10c018c30, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10c018d50, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10c018e70, {{0.0, 956.0}, {440.0, 243.0}}
+    Window, 0x10c018f90, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10c0190b0, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10c01ae00, {{0.0, 0.0}, {0.0, 0.0}}
+    Window, 0x10c01af20, {{0.0, 0.0}, {146.7, 318.7}}
+      Other, 0x10c01b040, {{0.0, 0.0}, {146.7, 318.7}}
+        Other, 0x10c01b160, {{0.0, 0.0}, {0.0, 0.0}}
 Path to element:
- →Application, 0x112e07330, pid: 72849, label: 'Phoebe'
+ →Application, 0x122c05050, pid: 35953, label: 'Phoebe'
 Query chain:
  →Find: Target Application 'com.kolarislabs.phoebe'
   Output: {
-    Application, 0x104313430, pid: 72849, label: 'Phoebe'
+    Application, 0x107604d10, pid: 35953, label: 'Phoebe'
   }
 )

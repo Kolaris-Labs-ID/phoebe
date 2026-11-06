@@ -20,14 +20,15 @@ import (
 	"phoebe/internal/jsonx"
 	"phoebe/internal/meetings"
 	"phoebe/internal/storage"
+	"phoebe/internal/transcripts"
 )
 
 // Starter is the transcripts seam for auto-start at verify (backend.md §7.3), implemented by
 // *transcripts.Service: Start transcription inside the caller's tx (meeting lock held) as
-// POST …/transcription with Idempotency-Key key and body {"language": language}, leaving
-// tx usable on error. Client-visible refusals are *apperr.Error.
+// POST …/transcription with Idempotency-Key key and body {"language": language, "notes":
+// notes}, leaving tx usable on error. Client-visible refusals are *apperr.Error.
 type Starter interface {
-	StartInTx(ctx context.Context, tx pgx.Tx, userID, meetingID, key, language string) (*jobs.Job, bool, error)
+	StartInTx(ctx context.Context, tx pgx.Tx, userID, meetingID, key, language, notes string) (*jobs.Job, bool, error)
 }
 
 type Service struct {
@@ -54,13 +55,20 @@ type CreateInput struct {
 type TranscriptionInput struct {
 	IdempotencyKey *string `json:"idempotency_key"`
 	Language       *string `json:"language"`
+	Notes          *string `json:"notes"`
 }
 
 // Result is the complete / last-chunk response body (api.md §4.4).
 type Result struct {
-	Upload *meetings.UploadSession `json:"upload"`
-	Audio  *meetings.AudioAsset    `json:"audio"`
-	Job    *meetings.Job           `json:"job"`
+	Upload               *meetings.UploadSession `json:"upload"`
+	Audio                *meetings.AudioAsset    `json:"audio"`
+	Job                  *meetings.Job           `json:"job"`
+	TranscriptionBlocked *Blocked                `json:"transcription_blocked"`
+}
+
+type Blocked struct {
+	Code       apperr.Code `json:"code"`
+	NextSlotAt *jsonx.Time `json:"next_slot_at"`
 }
 
 var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -68,20 +76,24 @@ var sha256Re = regexp.MustCompile(`^[0-9a-f]{64}$`)
 type session struct {
 	ID, MeetingID, UserID, Status, ContentType, SHA256, StorageKey string
 	SizeBytes, ReceivedBytes, DurationMS                           int64
-	TranscribeKey, TranscribeLang, FailureReason                   *string
+	TranscribeKey, TranscribeLang, TranscribeNotes, FailureReason  *string
+	TranscribeJobID, BlockedCode                                   *string
+	BlockedNextSlotAt                                              *time.Time
 	LeaseLive, Expired                                             bool
 	ExpiresAt, CreatedAt                                           time.Time
 }
 
 const sessionCols = `s.id, s.meeting_id, s.user_id, s.status, s.declared_content_type, s.sha256, s.storage_key,
 	s.size_bytes, s.received_bytes, s.declared_duration_ms, s.transcribe_idempotency_key, s.transcribe_language,
-	s.failure_reason, COALESCE(s.writer_lease_until > now(), false), s.expires_at <= now(), s.expires_at, s.created_at`
+	s.transcribe_notes, s.failure_reason, s.transcribe_job_id, s.transcription_blocked, s.transcription_blocked_next_slot_at,
+	COALESCE(s.writer_lease_until > now(), false), s.expires_at <= now(), s.expires_at, s.created_at`
 
 func scanSession(row pgx.Row) (*session, error) {
 	var x session
 	err := row.Scan(&x.ID, &x.MeetingID, &x.UserID, &x.Status, &x.ContentType, &x.SHA256, &x.StorageKey,
 		&x.SizeBytes, &x.ReceivedBytes, &x.DurationMS, &x.TranscribeKey, &x.TranscribeLang,
-		&x.FailureReason, &x.LeaseLive, &x.Expired, &x.ExpiresAt, &x.CreatedAt)
+		&x.TranscribeNotes, &x.FailureReason, &x.TranscribeJobID, &x.BlockedCode, &x.BlockedNextSlotAt,
+		&x.LeaseLive, &x.Expired, &x.ExpiresAt, &x.CreatedAt)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, apperr.ErrNotFound
 	}
@@ -122,7 +134,7 @@ func finalKey(x *session, contentType string) string {
 
 func ms(d time.Duration) int64 { return d.Milliseconds() }
 
-func validate(in CreateInput, maxBytes int64) (ct, sha, key, lang string, err error) {
+func validate(in CreateInput, maxBytes int64) (ct, sha, key, lang, notes string, err error) {
 	var f []apperr.FieldError
 	add := func(field, reason string) { f = append(f, apperr.FieldError{Field: field, Reason: reason}) }
 	switch {
@@ -165,14 +177,22 @@ func validate(in CreateInput, maxBytes int64) (ct, sha, key, lang string, err er
 		default:
 			add("transcription.language", apperr.ReasonInvalid)
 		}
+		switch {
+		case t.Notes == nil:
+			notes = transcripts.NotesAuto
+		case transcripts.ValidNotes(*t.Notes):
+			notes = *t.Notes
+		default:
+			add("transcription.notes", apperr.ReasonInvalid)
+		}
 	}
 	if len(f) > 0 {
-		return "", "", "", "", apperr.Validation(f...)
+		return "", "", "", "", "", apperr.Validation(f...)
 	}
 	if *in.SizeBytes > maxBytes {
-		return "", "", "", "", apperr.New(apperr.UploadTooLarge)
+		return "", "", "", "", "", apperr.New(apperr.UploadTooLarge)
 	}
-	return ct, sha, key, lang, nil
+	return ct, sha, key, lang, notes, nil
 }
 
 // Create implements POST /v1/meetings/{id}/uploads (backend.md §7.1). created=false is a resume (200).
@@ -184,7 +204,7 @@ func (s *Service) Create(ctx context.Context, userID, meetingID string, in Creat
 		if err := db.LockMeeting(ctx, tx, meetingID, userID); err != nil {
 			return err
 		}
-		ct, sha, key, lang, err := validate(in, s.cfg.MaxUploadBytes)
+		ct, sha, key, lang, notes, err := validate(in, s.cfg.MaxUploadBytes)
 		if err != nil {
 			return err
 		}
@@ -209,10 +229,10 @@ func (s *Service) Create(ctx context.Context, userID, meetingID string, in Creat
 			case !stale && live.SHA256 == sha && live.SizeBytes == *in.SizeBytes:
 				if live.TranscribeKey == nil && key != "" {
 					if _, err := tx.Exec(ctx, `UPDATE upload_sessions SET transcribe_idempotency_key = $2, transcribe_language = $3,
-						updated_at = now() WHERE id = $1`, live.ID, key, lang); err != nil {
+						transcribe_notes = $4, updated_at = now() WHERE id = $1`, live.ID, key, lang, notes); err != nil {
 						return err
 					}
-					live.TranscribeKey, live.TranscribeLang = &key, &lang
+					live.TranscribeKey, live.TranscribeLang, live.TranscribeNotes = &key, &lang, &notes
 					if err := db.TouchMeeting(ctx, tx, meetingID); err != nil {
 						return err
 					}
@@ -233,16 +253,16 @@ func (s *Service) Create(ctx context.Context, userID, meetingID string, in Creat
 			staleKey = live.StorageKey
 		}
 		id := ids.New()
-		var tk, tl *string
+		var tk, tl, tn *string
 		if key != "" {
-			tk, tl = &key, &lang
+			tk, tl, tn = &key, &lang, &notes
 		}
 		out, err = scanSession(tx.QueryRow(ctx, `
 			INSERT INTO upload_sessions AS s (id, meeting_id, user_id, declared_content_type, size_bytes, sha256,
-			    declared_duration_ms, storage_key, transcribe_idempotency_key, transcribe_language, expires_at)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now() + $11 * interval '1 millisecond')
+			    declared_duration_ms, storage_key, transcribe_idempotency_key, transcribe_language, transcribe_notes, expires_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now() + $12 * interval '1 millisecond')
 			RETURNING `+sessionCols,
-			id, meetingID, userID, ct, *in.SizeBytes, sha, *in.DurationMS, tempKey(userID, meetingID, id), tk, tl,
+			id, meetingID, userID, ct, *in.SizeBytes, sha, *in.DurationMS, tempKey(userID, meetingID, id), tk, tl, tn,
 			ms(s.cfg.UploadSessionTTL)))
 		if err != nil {
 			return err

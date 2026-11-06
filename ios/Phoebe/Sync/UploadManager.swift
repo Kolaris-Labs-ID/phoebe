@@ -180,7 +180,7 @@ final class UploadManager: UploadManaging {
             upload.state = .creating
             let intent = store.intents(meeting.id).first { $0.type == .transcribe }
             let transcription = intent.map {
-                TranscriptionStart(idempotencyKey: $0.idempotencyKey, language: IntentSender.language(of: $0) ?? meeting.transcriptionLanguage)
+                TranscriptionStart(idempotencyKey: $0.idempotencyKey, language: IntentSender.language(of: $0) ?? meeting.transcriptionLanguage, notes: IntentSender.notes(of: $0))
             }
             intent?.keySent = true
             store.save()
@@ -316,10 +316,12 @@ final class UploadManager: UploadManaging {
         let file = chunk.usesSourceFile ? source : try await Self.stage(chunk, from: source, uploadID: uploadID)
         guard isLive(upload, meeting) else { return nil }
         let endpoint = Endpoints.uploadChunk(uploadID, offset: chunk.offset)
+        let request = try await env.api.authorizedRequest(endpoint)
+        guard isLive(upload, meeting) else { return nil }
         liveProgress[meeting.id] = Double(chunk.offset) / Double(upload.sizeBytes)
         let data: Data, response: URLResponse
         do {
-            (data, response) = try await transport.upload(env.api.makeRequest(endpoint), fromFile: file, taskDescription: uploadID.lower)
+            (data, response) = try await transport.upload(request, fromFile: file, taskDescription: uploadID.lower)
         } catch {
             liveProgress[meeting.id] = nil
             throw APIError.from(error)
@@ -334,6 +336,10 @@ final class UploadManager: UploadManaging {
     private func handle(_ result: UploadResultDTO, upload: PendingUpload, meeting: Meeting) -> UploadPlanner.Action {
         apply(result.upload, to: upload)
         if let audio = result.audio {
+            // Nothing was reserved; park the intent until the user picks wait or transcribe-only (no extra POST).
+            if result.job == nil, let blocked = result.transcriptionBlocked {
+                store.intents(meeting.id).filter { $0.type == .transcribe }.forEach { $0.lastErrorCode = blocked.code }
+            }
             markVerified(upload: upload, meeting: meeting, audio: audio, job: result.job)
             return .uploadChunks
         }

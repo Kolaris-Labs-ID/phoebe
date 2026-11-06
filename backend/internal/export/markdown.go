@@ -27,12 +27,15 @@ func renderMarkdown(d *doc) []byte {
 			blocks = append(blocks, mdActions(d, s.actions))
 		case s.typ == documents.SectionDiscussion:
 			for _, t := range s.topics {
-				blocks = append(blocks, "### "+withRefs(mdEscape(t.title), t.refs))
+				blocks = append(blocks, "### "+withRefs(mdEscape(t.title), mdRefs(t.refs)))
 				blocks = append(blocks, mdItems(s.style, t.points)...)
 			}
 		default:
 			blocks = append(blocks, mdItems(s.style, s.items)...)
 		}
+	}
+	if d.approximate {
+		blocks = append(blocks, mdRefs(d.l.approxLegend))
 	}
 	return []byte(strings.Join(blocks, "\n\n") + "\n")
 }
@@ -44,7 +47,7 @@ func mdItems(style string, items []item) []string {
 	if style == documents.StyleParagraph {
 		out := make([]string, len(items))
 		for i, it := range items {
-			out[i] = withRefs(mdEscape(it.text), it.refs)
+			out[i] = withRefs(mdEscape(it.text), mdRefs(it.refs))
 		}
 		return out
 	}
@@ -55,7 +58,7 @@ func mdItems(style string, items []item) []string {
 			marker = strconv.Itoa(i+1) + "."
 		}
 		indent := strings.Repeat(" ", len(marker)+1)
-		text := strings.ReplaceAll(withRefs(mdEscape(it.text), it.refs), "\n", "\n"+indent)
+		text := strings.ReplaceAll(withRefs(mdEscape(it.text), mdRefs(it.refs)), "\n", "\n"+indent)
 		lines[i] = marker + " " + text
 	}
 	return []string{strings.Join(lines, "\n")}
@@ -68,7 +71,7 @@ func mdActions(d *doc, actions []action) string {
 		"| --- | --- | --- | --- | --- |",
 	}
 	for i, a := range actions {
-		src := a.refs
+		src := mdRefs(a.refs)
 		if src == "" {
 			src = "-"
 		}
@@ -77,6 +80,9 @@ func mdActions(d *doc, actions []action) string {
 	}
 	return strings.Join(rows, "\n")
 }
+
+// mdRefs escapes "~" so approximate refs never pair into GFM strikethrough.
+func mdRefs(s string) string { return strings.ReplaceAll(s, "~", `\~`) }
 
 func mdCell(s string) string {
 	return mdEscape(strings.Join(strings.Fields(s), " "))

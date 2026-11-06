@@ -67,6 +67,7 @@ struct SourcePlayRequest: Identifiable, Equatable {
     let meetingID: UUID
     let startMs: Int
     let endMs: Int
+    var approximate = false
     let text: String?
 }
 
@@ -409,7 +410,7 @@ final class DocumentEditorModel {
             return p?.hasPendingWork == true || p?.isBlocked == true
         }
         if blocked { return L("doc.regen.syncFirst", table: .editor) }
-        let limitedUntil = [usage?.aiGenerations.nextAvailableAt, regenLimitedUntil].compactMap { $0 }.max()
+        let limitedUntil = [usage?.aiGenerations.nextSlotAt, regenLimitedUntil].compactMap { $0 }.max()
         if let limitedUntil, limitedUntil > now {
             return L("doc.regen.limited", table: .editor, limitedUntil.formatted(.relative(presentation: .named)))
         }
@@ -434,8 +435,9 @@ final class DocumentEditorModel {
             failedBannerDismissed = false
             app.poller.reset()
             app.poller.start(.meeting(meetingID))
-        } catch APIError.rateLimited(let seconds) {
-            regenLimitedUntil = .now.addingTimeInterval(TimeInterval(seconds ?? 3600))
+        } catch APIError.aiGenerationLimit(let next) {
+            let usage = await app.refreshUsage()
+            regenLimitedUntil = next ?? usage?.aiGenerations.nextSlotAt
         } catch APIError.jobInProgress {
             app.poller.start(.meeting(meetingID))
         } catch {
@@ -544,14 +546,14 @@ final class DocumentEditorModel {
     // MARK: Source references
 
     func isVerified(_ ref: SourceRef) -> Bool {
-        guard case .transcript(let segmentID, _, _) = ref else { return true }
+        guard case .transcript(let segmentID, _, _, _) = ref else { return true }
         let map = segments()
         return map.isEmpty || map[segmentID] != nil
     }
 
     func play(_ ref: SourceRef) {
-        guard case .transcript(let segmentID, let startMs, let endMs) = ref else { return }
-        playing = SourcePlayRequest(meetingID: meetingID, startMs: startMs, endMs: endMs, text: segments()[segmentID]?.text)
+        guard case .transcript(let segmentID, let startMs, let endMs, let approximate) = ref else { return }
+        playing = SourcePlayRequest(meetingID: meetingID, startMs: startMs, endMs: endMs, approximate: approximate, text: segments()[segmentID]?.text)
     }
 
     private func segments() -> [String: TranscriptSegment] {

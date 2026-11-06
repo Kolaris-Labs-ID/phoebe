@@ -131,7 +131,7 @@ struct UsageSummaryTests {
         UsageDTO(
             entitlement: EntitlementDTO(plan: plan, status: status, periodStart: nil, periodEnd: nil, quotaSeconds: quota),
             consumedSeconds: consumed, reservedSeconds: reserved, remainingSeconds: max(0, quota - consumed - reserved),
-            aiGenerations: AIGenerationsDTO(limitPerDay: 30, usedLast24h: 0, nextAvailableAt: nil)
+            aiGenerations: AIGenerationsDTO(limit: 30, windowHours: 24, used: 0, reserved: 0, remaining: 30, nextSlotAt: nil)
         )
     }
 

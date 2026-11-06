@@ -26,6 +26,10 @@ final class MeetingDetailModel {
     var dismissedStale: Set<UUID> = []
     var momSourceRevisionID: UUID?
     var showOriginal = false
+    var showAIChoice = false
+    var uncertainOnly = false
+    var reviewCursor: String?
+    var scrollTarget: String?
     @ObservationIgnored var leaveToastShown = false
 
     var showMetadata = false
@@ -140,13 +144,14 @@ final class MeetingDetailModel {
         do {
             try await app.sync.requestGeneration(meetingID: meetingID, type: type, body: body)
         } catch let error as APIError {
+            if error.isAIGenerationLimit {
+                retryAfterUntil = await app.refreshUsage()?.aiGenerations.nextSlotAt
+                if type == .transcribe { showAIChoice = true } else { actionErrors[type] = AILimitCopy.key }
+                return
+            }
             switch error {
             case .jobInProgress, .alreadyTranscribed:
                 break
-            case .rateLimited(let seconds):
-                retryAfterUntil = Date.now.addingTimeInterval(TimeInterval(seconds ?? 60))
-                actionErrors[type] = "doc.regen.limited"
-                return
             default:
                 actionErrors[type] = Self.errorKey(error)
                 return
@@ -178,7 +183,26 @@ final class MeetingDetailModel {
 
     func momBody() -> Data { APICoding.encode(GenerateMoMRequest(aiNotesRevisionId: momSourceRevisionID, language: nil)) }
 
-    func transcribeBody(language: TranscriptionLanguage) -> Data { APICoding.encode(TranscriptionRequest(language: language)) }
+    func transcribeBody(language: TranscriptionLanguage, notes: NotesMode = .auto) -> Data {
+        APICoding.encode(TranscriptionRequest(language: language, notes: notes))
+    }
+
+    // With automatic notes and no AI slot left, the user chooses before any minutes are reserved.
+    func startTranscription(language: TranscriptionLanguage, notes: NotesMode = .auto, app: AppModel) async {
+        if notes == .auto {
+            if app.isOnline { _ = await app.refreshUsage() }
+            if AIAllowance.needsChoice(usage: app.usage, notes: .auto) {
+                showAIChoice = true
+                return
+            }
+        }
+        await generate(.transcribe, body: transcribeBody(language: language, notes: notes), flushKinds: [], pendingKinds: [], app: app)
+    }
+
+    func stepReview(_ ids: [String], forward: Bool) {
+        reviewCursor = TranscriptReview.step(ids, from: reviewCursor, forward: forward)
+        scrollTarget = reviewCursor
+    }
 
     func retryUpload(app: AppModel) async {
         uploadRetrying = true
@@ -189,9 +213,12 @@ final class MeetingDetailModel {
 
     // MARK: Transcript correction (online only, no outbox)
 
-    func submitCorrection(segmentID: String, text: String, expectedRevision: Int, mutationID: UUID, app: AppModel) async -> CorrectionOutcome {
+    func submitCorrection(segmentID: String, text: String, resolvedUncertain: [String] = [], expectedRevision: Int, mutationID: UUID, app: AppModel) async -> CorrectionOutcome {
         guard app.isOnline else { return .failed(key: "transcript.edit.offline") }
-        let body = TranscriptCorrectionRequest(expectedRevision: expectedRevision, mutationId: mutationID, edits: [SegmentEdit(segmentId: segmentID, text: text)])
+        let body = TranscriptCorrectionRequest(
+            expectedRevision: expectedRevision, mutationId: mutationID,
+            edits: [SegmentEdit(segmentId: segmentID, text: text)], resolvedUncertainSegmentIds: resolvedUncertain
+        )
         var attempt = 0
         while true {
             do {

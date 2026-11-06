@@ -1,191 +1,190 @@
-Optional(Attributes: Application, 0x104322c30, pid: 72849, label: 'Phoebe'
+Optional(Attributes: Application, 0x10a14c450, pid: 35953, label: 'Phoebe'
 Element subtree:
- →Application, 0x104322c30, pid: 72849, label: 'Phoebe'
-    Window (Main), 0x104321590, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x1042258b0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x112d10120, {{0.0, 0.0}, {393.0, 852.0}}
-          Other, 0x112f259d0, {{0.0, 0.0}, {393.0, 852.0}}
-            Other, 0x104718370, {{0.0, 0.0}, {393.0, 852.0}}
-              Other, 0x104706080, {{0.0, 0.0}, {393.0, 852.0}}
-                NavigationBar, 0x10470d0f0, {{0.0, 53.7}, {393.0, 44.0}}, identifier: 'Meeting'
-                  Button, 0x104717ca0, {{0.0, 53.7}, {92.3, 44.0}}, label: 'Meeting'
-                  Other, 0x10471b0a0, {{325.0, 53.7}, {52.0, 44.0}}, label: 'Tindakan lain'
-                    Other, 0x104719f90, {{325.0, 53.7}, {52.0, 44.0}}
-                      Button, 0x10471a9c0, {{325.0, 49.7}, {52.0, 52.0}}, label: 'Tindakan lain'
-                        Button, 0x104719c10, {{325.0, 49.7}, {52.0, 52.0}}
-                          Other, 0x104705190, {{325.0, 49.7}, {52.0, 52.0}}
-                            Image, 0x10470c620, {{325.0, 49.7}, {52.0, 52.0}}, identifier: 'ellipsis.circle', label: 'Lainnya'
-                  StaticText, 0x112810b40, {{196.0, 75.3}, {1.0, 1.0}}, label: 'Meeting'
-                    Other, 0x11280fa00, {{196.0, 75.3}, {1.0, 1.0}}
-                      Other, 0x11281bb60, {{196.0, 75.3}, {1.0, 1.0}}
-                Other, 0x11281d080, {{0.0, 0.0}, {393.0, 852.0}}
-                  Other, 0x11281f680, {{0.0, 0.0}, {393.0, 852.0}}
-                    Other, 0x1043216b0, {{0.0, 0.0}, {393.0, 852.0}}
-                      Other, 0x1043217d0, {{0.0, 0.0}, {393.0, 852.0}}
-                        ScrollView, 0x10691a660, {{0.0, 0.0}, {393.0, 852.0}}
-                          Other, 0x10691a990, {{0.0, 97.7}, {393.0, 1066.0}}
-                            Other, 0x104323dd0, {{16.0, 105.7}, {361.0, 1009.3}}
-                              Button, 0x104323ef0, {{16.0, 105.7}, {123.3, 26.3}}, label: 'RapatUjiE2E'
-                              StaticText, 0x106a24390, {{16.0, 140.0}, {229.7, 18.0}}, label: 'Tanggal belum ditentukan · 00:20'
-                              Other, 0x106a21070, {{18.0, 166.0}, {277.0, 44.0}}
-                                Image, 0x106a27620, {{18.0, 181.0}, {21.7, 14.7}}, identifier: 'person.2', label: 'person.2'
-                                StaticText, 0x106a2bcf0, {{48.7, 179.0}, {128.0, 18.0}}, label: 'Belum ada peserta'
-                                Button, 0x104712c70, {{184.7, 166.0}, {110.3, 44.0}}, label: 'Tambah peserta'
-                              ScrollView, 0x104713ac0, {{16.0, 218.0}, {361.0, 44.0}}
-                                Other, 0x1047186e0, {{16.0, 218.0}, {208.0, 44.0}}
-                                  Button, 0x104717260, {{16.0, 218.0}, {112.7, 44.0}}, label: 'Tanpa folder'
-                                    Image, 0x104718dc0, {{25.3, 234.3}, {13.7, 11.0}}, identifier: 'folder', label: 'Pindahkan'
-                                    StaticText, 0x104716ee0, {{16.0, 218.0}, {112.7, 44.0}}, label: 'Tanpa folder'
-                                  Button, 0x10470a4a0, {{136.7, 218.0}, {87.3, 44.0}}, label: 'Tag baru'
-                                    Image, 0x104709750, {{146.0, 234.7}, {10.0, 10.0}}, identifier: 'plus', label: 'Tambah'
-                                    StaticText, 0x104707c70, {{136.7, 218.0}, {87.3, 44.0}}, label: 'Tag baru'
-                              Other, 0x104708cd0, {{43.7, 290.0}, {77.2, 36.3}}, label: 'Upload: Selesai'
-                                Image, 0x106834d60, {{43.7, 291.7}, {21.0, 14.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
-                                StaticText, 0x106834e80, {{69.8, 290.0}, {51.0, 18.0}}, label: 'Upload'
-                                StaticText, 0x106834fa0, {{60.7, 312.0}, {41.7, 14.3}}, label: 'Selesai'
-                              Other, 0x10682fe70, {{154.7, 291.0}, {85.0, 36.3}}, label: 'Transkrip: Siap'
-                                Image, 0x10682ff90, {{154.7, 291.0}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
-                                StaticText, 0x1068300b0, {{177.0, 291.2}, {62.7, 16.7}}, label: 'Transkrip'
-                                StaticText, 0x10691dd30, {{183.8, 313.0}, {25.3, 14.3}}, label: 'Siap'
-                              Other, 0x1069194c0, {{281.3, 291.0}, {61.7, 36.3}}, label: 'Notes: Siap'
-                                Image, 0x1069175a0, {{281.3, 291.0}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
-                                StaticText, 0x10691cc00, {{303.7, 291.2}, {39.3, 16.7}}, label: 'Notes'
-                                StaticText, 0x104229a30, {{298.8, 313.0}, {25.3, 14.3}}, label: 'Siap'
-                              Button, 0x112e1c040, {{28.0, 367.3}, {44.0, 44.0}}, identifier: 'gobackward.15', label: 'Mundur 15 detik'
-                              Button, 0x112e1c160, {{88.0, 367.3}, {44.0, 44.0}}, identifier: 'play.fill', label: 'Putar'
-                              Button, 0x112e1c280, {{148.0, 367.3}, {44.0, 44.0}}, identifier: 'goforward.15', label: 'Maju 15 detik'
-                              StaticText, 0x112e1c3a0, {{270.3, 380.3}, {94.7, 18.0}}, label: '00:00 / 00:20'
-                              Slider, 0x112d10240, {{28.0, 419.3}, {337.0, 31.0}}, label: 'Posisi', value: 0 detik dari 20 de...
-                              Image, 0x112d10c00, {{34.0, 560.0}, {14.3, 15.3}}, identifier: 'person.fill', label: 'person.fill'
-                              StaticText, 0x104705d20, {{34.0, 557.3}, {132.7, 20.3}}, label: 'Catatan Anda'
-                              StaticText, 0x104709d70, {{276.0, 560.4}, {85.0, 14.3}}, label: 'Tersinkron'
-                                Image, 0x10470b060, {{276.0, 561.3}, {15.0, 10.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
-                                StaticText, 0x104711ed0, {{276.0, 560.4}, {85.0, 14.3}}, label: 'Tersinkron'
-                              StaticText, 0x1047210a0, {{32.0, 600.7}, {7.7, 20.3}}, label: '•'
-                              TextField, 0x10470d440, {{47.7, 600.7}, {313.3, 22.0}}, value: Poin pribadi e2e, Keyboard Focused
-                                Other, 0x10472b0a0, {{47.7, 608.7}, {313.3, 11.0}}, label: 'Bar gulir horizontal, 1 halaman', value: 0%
-                                  Other, 0x10472a860, {{50.7, 616.7}, {307.3, 3.0}}
-                              Button, 0x104729260, {{32.0, 645.7}, {118.0, 44.0}}, label: 'Tambah poin'
-                                Image, 0x1068301d0, {{34.0, 661.0}, {13.0, 13.0}}, identifier: 'plus', label: 'Tambah'
-                                StaticText, 0x1068302f0, {{32.0, 645.7}, {118.0, 44.0}}, label: 'Tambah poin'
-                              Image, 0x106830410, {{33.7, 750.0}, {16.0, 19.3}}, identifier: 'sparkles', label: 'Berkilau'
-                              StaticText, 0x106830530, {{33.7, 750.0}, {93.3, 20.3}}, label: 'Notes AI'
-                              Button, 0x112e1c4c0, {{255.7, 737.7}, {44.0, 44.0}}, identifier: 'clock.arrow.circlepath', label: 'Versi'
-                              Button, 0x112e1d220, {{307.7, 742.7}, {53.3, 34.3}}, label: 'Edit'
-                              StaticText, 0x112e1d340, {{32.0, 793.7}, {82.3, 20.3}}, label: 'Ringkasan'
-                              StaticText, 0x112e1d460, {{32.0, 822.0}, {7.7, 20.3}}, label: '•'
-                              StaticText, 0x112e1d580, {{47.7, 822.0}, {231.7, 44.7}}, label: 'Selamat pagi semua, mari kita mulai rapatnya.'
-                              Other, 0x112e1d6a0, {{47.7, 883.7}, {43.0, 18.3}}, label: 'Dibuat AI'
-                                Image, 0x112e1d7c0, {{56.7, 887.3}, {9.0, 10.7}}, identifier: 'sparkles', label: 'Berkilau'
-                                StaticText, 0x112e1d8e0, {{70.7, 885.5}, {12.0, 14.3}}, label: 'AI'
-                              Button, 0x112e1da00, {{98.7, 870.7}, {57.3, 44.0}}, label: 'Putar dari 00:00'
-                                Image, 0x112e1db20, {{99.7, 886.3}, {12.3, 12.3}}, identifier: 'clock', label: 'Jam'
-                                StaticText, 0x104024580, {{98.7, 870.7}, {57.3, 44.0}}, label: '00:00'
-                              StaticText, 0x1040247f0, {{32.0, 922.7}, {7.7, 20.3}}, label: '•'
-                              StaticText, 0x112f249f0, {{47.7, 922.7}, {259.7, 44.7}}, label: 'Agenda hari ini adalah membahas progres proyek.'
-                              Other, 0x11290d670, {{47.7, 984.3}, {43.0, 18.3}}, label: 'Dibuat AI'
-                                Image, 0x10440ea90, {{56.7, 988.0}, {9.0, 10.7}}, identifier: 'sparkles', label: 'Berkilau'
-                                StaticText, 0x10440dcc0, {{70.7, 986.2}, {12.0, 14.3}}, label: 'AI'
-                              Button, 0x1044089e0, {{98.7, 971.3}, {57.3, 44.0}}, label: 'Putar dari 00:15'
-                                Image, 0x10440c860, {{99.7, 987.0}, {12.3, 12.3}}, identifier: 'clock', label: 'Jam'
-                                StaticText, 0x10440e020, {{98.7, 971.3}, {57.3, 44.0}}, label: '00:15'
-                              Button, 0x10440e3b0, {{32.0, 1027.3}, {132.0, 50.0}}, label: 'Buat ulang'
-                                Image, 0x10471e600, {{45.7, 1042.7}, {15.7, 19.0}}, identifier: 'sparkles', label: 'Berkilau'
-                                StaticText, 0x10472ac80, {{32.0, 1027.3}, {132.0, 50.0}}, label: 'Buat ulang'
-                              StaticText, 0x10472ca00, {{32.0, 1081.3}, {321.3, 33.7}}, label: 'Membuat versi baru. Versi sebelumnya dan hasil edit Anda tetap tersimpan.'
-                              SegmentedControl, 0x10472cb20, {{16.0, 486.3}, {361.0, 31.0}}
-                                Button, 0x10472cc40, {{16.0, 486.3}, {119.0, 32.0}}, label: 'Transkrip'
-                                Button, 0x10460a770, {{136.0, 486.3}, {120.0, 32.0}}, label: 'Catatan', Selected
-                                Button, 0x1046116d0, {{257.0, 486.3}, {120.0, 32.0}}, label: 'MoM'
-                          Other, 0x104612820, {{360.0, 97.7}, {30.0, 374.3}}, label: 'Bar gulir vertikal, 3 halaman', value: 0%
-                            Other, 0x104610940, {{387.0, 100.7}, {3.0, 203.3}}
-                          Other, 0x104611370, {{360.0, 97.7}, {30.0, 374.3}}, label: 'Bar gulir vertikal, 3 halaman', value: 0%
-                            Other, 0x104611020, {{387.0, 100.7}, {3.0, 203.3}}
-    Window, 0x104612110, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x104612490, {{0.0, 0.0}, {393.0, 852.0}}
-    Window, 0x10472cd60, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x10472ce80, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x10472cfa0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x10472d0c0, {{0.0, 472.0}, {393.0, 380.0}}
-          Other, 0x10472d1e0, {{0.0, 472.0}, {393.0, 44.0}}
-            Other, 0x10472d300, {{0.0, 472.0}, {393.0, 44.0}}
-              Other, 0x10472d420, {{0.0, 472.0}, {393.0, 44.0}}
-                Toolbar, 0x10472d540, {{0.0, 472.0}, {393.0, 44.0}}, identifier: 'Toolbar', label: 'Bar Alat'
-                  Other, 0x11290c560, {{0.0, 472.0}, {393.0, 44.0}}
-                    Other, 0x106927fc0, {{0.0, 472.0}, {393.0, 44.0}}
-                      Button, 0x106830650, {{337.0, 472.0}, {56.0, 44.0}}, label: 'Hapus poin'
-          Other, 0x11290fc80, {{0.0, 516.0}, {393.0, 278.0}}
-    Window, 0x11290da00, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x1042260f0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x106a2c930, {{0.0, 472.0}, {393.0, 380.0}}
-          Other, 0x106a2ca50, {{0.0, 472.0}, {393.0, 44.0}}
-          Other, 0x106a2d290, {{0.0, 516.0}, {393.0, 45.0}}
-            Other, 0x106a2d3b0, {{0.0, 516.0}, {393.0, 45.0}}
-              Other, 0x106a2d4d0, {{0.0, 516.0}, {393.0, 45.0}}
-          Other, 0x112f24b10, {{0.0, 516.0}, {393.0, 45.0}}, identifier: 'SystemInputAssistantView'
-            Other, 0x112f24c30, {{0.0, 516.0}, {393.0, 45.0}}
-              Other, 0x112f24d50, {{0.0, 516.0}, {393.0, 45.0}}, identifier: 'CenterPageView'
-                Other, 0x112f25af0, {{0.0, -84.0}, {393.0, 1245.0}}
-                  ScrollView, 0x104324010, {{0.0, 516.0}, {393.0, 45.0}}
-                Other, 0x104324130, {{0.0, 516.0}, {393.0, 45.0}}
-                  Other, 0x104324250, {{0.0, 516.0}, {393.0, 45.0}}, label: 'Prediksi Pengetikan'
-                    Other, 0x104324370, {{0.0, 516.0}, {393.0, 45.0}}
-                      Other, 0x104324490, {{0.0, 516.0}, {393.0, 45.0}}
-                        Other, 0x104408d80, {{0.0, 516.0}, {131.0, 45.0}}, label: '“P”'
-                        Other, 0x1069263d0, {{131.0, 516.0}, {131.0, 45.0}}, label: 'Please'
-                        Other, 0x106927560, {{262.0, 516.0}, {131.0, 45.0}}, label: 'Play'
-          Other, 0x106926760, {{0.0, 561.0}, {393.0, 233.0}}
-            Other, 0x10691b740, {{0.0, 561.0}, {393.0, 291.0}}
-              Other, 0x1069227d0, {{0.0, 561.0}, {393.0, 291.0}}
-                Other, 0x106922b50, {{0.0, 561.0}, {393.0, 291.0}}
-          Other, 0x106922110, {{0.0, 561.0}, {393.0, 233.0}}
-            Keyboard, 0x10691f4f0, {{0.0, 561.0}, {393.0, 233.0}}
-              Other, 0x106922ee0, {{0.0, 561.0}, {393.0, 233.0}}
-                Other, 0x106921dc0, {{0.0, 561.0}, {393.0, 233.0}}, identifier: 'UIKeyboardLayoutStar Preview'
-                  Key, 0x106923240, {{0.0, 568.0}, {39.3, 46.0}}, label: 'Q'
-                  Key, 0x106923d50, {{39.3, 568.0}, {39.3, 46.0}}, label: 'W'
-                  Key, 0x10691c180, {{78.7, 568.0}, {39.3, 46.0}}, label: 'E'
-                  Key, 0x10691ff30, {{118.0, 568.0}, {39.3, 46.0}}, label: 'R'
-                  Key, 0x106926e80, {{157.3, 568.0}, {39.3, 46.0}}, label: 'T'
-                  Key, 0x106918dc0, {{196.7, 568.0}, {39.0, 46.0}}, label: 'Y'
-                  Key, 0x1069271f0, {{235.7, 568.0}, {39.3, 46.0}}, label: 'U'
-                  Key, 0x106926b00, {{275.0, 568.0}, {39.3, 46.0}}, label: 'I'
-                  Key, 0x10472d660, {{314.3, 568.0}, {39.3, 46.0}}, label: 'O'
-                  Key, 0x104024910, {{353.7, 568.0}, {39.3, 46.0}}, label: 'P'
-                  Key, 0x104024a30, {{19.3, 622.0}, {39.3, 46.0}}, label: 'A'
-                  Key, 0x104024b50, {{58.7, 622.0}, {39.3, 46.0}}, label: 'S'
-                  Key, 0x104024c70, {{98.0, 622.0}, {39.3, 46.0}}, label: 'D'
-                  Key, 0x1129145e0, {{137.3, 622.0}, {39.3, 46.0}}, label: 'F'
-                  Key, 0x112910ac0, {{177.2, 622.0}, {39.3, 46.0}}, label: 'G'
-                  Key, 0x112914cb0, {{216.5, 622.0}, {39.3, 46.0}}, label: 'H'
-                  Key, 0x112915040, {{255.9, 622.0}, {39.3, 46.0}}, label: 'J'
-                  Key, 0x11290e7e0, {{295.2, 622.0}, {39.3, 46.0}}, label: 'K'
-                  Key, 0x112915940, {{334.5, 622.0}, {39.3, 46.0}}, label: 'L'
-                  Button, 0x1129080e0, {{0.0, 676.0}, {50.3, 46.0}}, identifier: 'shift', label: 'shift', Selected
-                  Key, 0x11281f7a0, {{58.7, 676.0}, {39.3, 46.0}}, label: 'Z'
-                  Key, 0x112d10d20, {{98.0, 676.0}, {39.3, 46.0}}, label: 'X'
-                  Key, 0x112918900, {{137.3, 676.0}, {39.3, 46.0}}, label: 'C'
-                  Key, 0x104225cd0, {{177.2, 676.0}, {39.3, 46.0}}, label: 'V'
-                  Key, 0x10472d780, {{216.5, 676.0}, {39.3, 46.0}}, label: 'B'
-                  Key, 0x104611a30, {{255.9, 676.0}, {39.3, 46.0}}, label: 'N'
-                  Key, 0x104024d90, {{295.2, 676.0}, {39.3, 46.0}}, label: 'M'
-                  Key, 0x112e1dd90, {{342.7, 676.0}, {50.3, 46.0}}, identifier: 'delete', label: 'delete'
-                  Key, 0x106830770, {{0.0, 730.0}, {48.7, 46.0}}, identifier: 'more', label: 'numbers'
-                  Button, 0x106830890, {{48.7, 730.0}, {49.3, 46.0}}, label: 'Emoji'
-                  Key, 0x1068309b0, {{97.3, 730.0}, {197.7, 46.0}}, label: ' '
-                  Button, 0x106830ad0, {{295.0, 730.0}, {98.0, 46.0}}, identifier: 'Return', label: 'return'
-          Other, 0x1040250b0, {{0.0, 561.0}, {393.0, 291.0}}
-            Button, 0x112f25c10, {{8.5, 783.7}, {68.1, 68.7}}, label: 'Papan ketik berikutnya', value: Bahasa Indonesia &...
-              StaticText, 0x112f25d30, {{8.5, 783.7}, {0.0, 0.0}}
-            Button, 0x112d10e40, {{316.4, 783.4}, {68.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
-              StaticText, 0x10440b020, {{316.4, 783.4}, {0.0, 0.0}}
-            Button, 0x112d11700, {{316.4, 783.4}, {68.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
-              StaticText, 0x106830bf0, {{316.4, 783.4}, {0.0, 0.0}}
+ →Application, 0x10a14c450, pid: 35953, label: 'Phoebe'
+    Window (Main), 0x10a14d0f0, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10a14d4b0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10a14d5d0, {{0.0, 0.0}, {440.0, 956.0}}
+          Other, 0x10a14d210, {{0.0, 0.0}, {440.0, 956.0}}
+            Other, 0x10a14d330, {{0.0, 0.0}, {440.0, 956.0}}
+              Other, 0x10a14d6f0, {{0.0, 0.0}, {440.0, 956.0}}
+                NavigationBar, 0x10a14d810, {{0.0, 56.3}, {440.0, 44.0}}, identifier: 'Meeting'
+                  Button, 0x10a14d930, {{0.0, 56.3}, {96.3, 44.0}}, label: 'Meeting'
+                  Other, 0x10a14da50, {{368.0, 56.3}, {52.0, 44.0}}, label: 'Tindakan lain'
+                    Other, 0x10a14db70, {{368.0, 56.3}, {52.0, 44.0}}
+                      Button, 0x10a14dc90, {{368.0, 52.3}, {52.0, 52.0}}, label: 'Tindakan lain'
+                        Button, 0x10a14ddb0, {{368.0, 52.3}, {52.0, 52.0}}
+                          Other, 0x10a14ded0, {{368.0, 52.3}, {52.0, 52.0}}
+                            Image, 0x10a14dff0, {{368.0, 52.3}, {52.0, 52.0}}, identifier: 'ellipsis.circle', label: 'Lainnya'
+                  StaticText, 0x10a14e110, {{219.7, 78.0}, {1.0, 1.0}}, label: 'Meeting'
+                    Other, 0x10a14e230, {{219.7, 78.0}, {1.0, 1.0}}
+                      Other, 0x10a14e350, {{219.7, 78.0}, {1.0, 1.0}}
+                Other, 0x10a14e470, {{0.0, 0.0}, {440.0, 956.0}}
+                  Other, 0x10a14e590, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x10a14e6b0, {{0.0, 0.0}, {440.0, 956.0}}
+                      Other, 0x10a14e7d0, {{0.0, 0.0}, {440.0, 956.0}}
+                        ScrollView, 0x10a14e8f0, {{0.0, 0.0}, {440.0, 956.0}}
+                          Other, 0x10a14ea10, {{0.0, 45.3}, {440.0, 1041.0}}
+                            Other, 0x10743b5b0, {{16.0, 53.3}, {408.0, 985.0}}
+                              Button, 0x10743e0d0, {{16.0, 53.3}, {123.3, 26.3}}, label: 'RapatUjiE2E'
+                              StaticText, 0x10743cf70, {{16.0, 87.7}, {229.7, 18.0}}, label: 'Tanggal belum ditentukan · 00:20'
+                              Other, 0x10743e9b0, {{18.0, 113.7}, {277.0, 44.0}}
+                                Image, 0x10743edd0, {{18.0, 128.7}, {21.7, 14.7}}, identifier: 'person.2', label: 'person.2'
+                                StaticText, 0x107438180, {{48.7, 126.7}, {128.0, 18.0}}, label: 'Belum ada peserta'
+                                Button, 0x107446ac0, {{184.7, 113.7}, {110.3, 44.0}}, label: 'Tambah peserta'
+                              ScrollView, 0x107446be0, {{16.0, 165.7}, {408.0, 44.0}}
+                                Other, 0x107446d00, {{16.0, 165.7}, {208.0, 44.0}}
+                                  Button, 0x107446e20, {{16.0, 165.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                    Image, 0x107446f40, {{25.3, 182.0}, {13.7, 11.0}}, identifier: 'folder', label: 'Pindahkan'
+                                    StaticText, 0x107447060, {{16.0, 165.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                  Button, 0x107447180, {{136.7, 165.7}, {87.3, 44.0}}, label: 'Tag baru'
+                                    Image, 0x1074472a0, {{146.0, 182.3}, {10.0, 10.0}}, identifier: 'plus', label: 'Tambah'
+                                    StaticText, 0x1074473c0, {{136.7, 165.7}, {87.3, 44.0}}, label: 'Tag baru'
+                              Other, 0x1074474e0, {{51.3, 237.7}, {77.3, 36.3}}, label: 'Upload: Selesai'
+                                Image, 0x107447600, {{51.3, 239.3}, {21.0, 14.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
+                                StaticText, 0x107447720, {{77.7, 237.7}, {51.0, 18.0}}, label: 'Upload'
+                                StaticText, 0x107447840, {{68.5, 259.7}, {41.7, 14.3}}, label: 'Selesai'
+                              Other, 0x10743c810, {{178.3, 238.7}, {84.8, 36.3}}, label: 'Transkrip: Siap'
+                                Image, 0x10743c930, {{178.3, 238.7}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
+                                StaticText, 0x10743ca50, {{200.5, 238.8}, {62.7, 16.7}}, label: 'Transkrip'
+                                StaticText, 0x10743cb70, {{207.3, 260.7}, {25.3, 14.3}}, label: 'Siap'
+                              Other, 0x107448dc0, {{320.7, 238.7}, {61.5, 36.3}}, label: 'Notes: Siap'
+                                Image, 0x107448ee0, {{320.7, 238.7}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
+                                StaticText, 0x107449000, {{342.8, 238.8}, {39.3, 16.7}}, label: 'Notes'
+                                StaticText, 0x107449120, {{338.0, 260.7}, {25.3, 14.3}}, label: 'Siap'
+                              Button, 0x107449240, {{28.0, 315.0}, {44.0, 44.0}}, identifier: 'gobackward.15', label: 'Mundur 15 detik'
+                              Button, 0x107449360, {{88.0, 315.0}, {44.0, 44.0}}, identifier: 'play.fill', label: 'Putar'
+                              Button, 0x107449480, {{148.0, 315.0}, {44.0, 44.0}}, identifier: 'goforward.15', label: 'Maju 15 detik'
+                              StaticText, 0x1074495a0, {{317.3, 328.0}, {94.7, 18.0}}, label: '00:00 / 00:20'
+                              Slider, 0x1074496c0, {{28.0, 367.0}, {384.0, 31.0}}, label: 'Posisi', value: 0 detik dari 20 de...
+                              Image, 0x1074497e0, {{34.0, 507.7}, {14.3, 15.3}}, identifier: 'person.fill', label: 'person.fill'
+                              StaticText, 0x107449900, {{34.0, 505.0}, {132.7, 20.3}}, label: 'Catatan Anda'
+                              StaticText, 0x107449a20, {{323.0, 508.0}, {85.0, 14.3}}, label: 'Tersinkron'
+                                Image, 0x107449b40, {{323.0, 509.0}, {15.0, 10.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
+                                StaticText, 0x107449c60, {{323.0, 508.0}, {85.0, 14.3}}, label: 'Tersinkron'
+                              StaticText, 0x107449d80, {{32.0, 548.3}, {7.7, 20.3}}, label: '•'
+                              TextField, 0x107449ea0, {{47.7, 548.3}, {360.3, 22.0}}, value: Poin pribadi e2e, Keyboard Focused
+                                Other, 0x107449fc0, {{47.7, 556.3}, {360.3, 11.0}}, label: 'Bar gulir horizontal, 1 halaman', value: 0%
+                                  Other, 0x10744a0e0, {{50.7, 564.3}, {354.3, 3.0}}
+                              Button, 0x10744a200, {{32.0, 593.3}, {118.0, 44.0}}, label: 'Tambah poin'
+                                Image, 0x10744a320, {{34.0, 608.7}, {13.0, 13.0}}, identifier: 'plus', label: 'Tambah'
+                                StaticText, 0x10744a440, {{32.0, 593.3}, {118.0, 44.0}}, label: 'Tambah poin'
+                              Image, 0x10744a560, {{33.7, 697.7}, {16.0, 19.3}}, identifier: 'sparkles', label: 'Berkilau'
+                              StaticText, 0x10744a680, {{33.7, 697.7}, {93.3, 20.3}}, label: 'Notes AI'
+                              Button, 0x10744a7a0, {{302.7, 685.3}, {44.0, 44.0}}, identifier: 'clock.arrow.circlepath', label: 'Versi'
+                              Button, 0x10744a8c0, {{354.7, 690.3}, {53.3, 34.3}}, label: 'Edit'
+                              StaticText, 0x10744a9e0, {{32.0, 741.3}, {82.3, 20.3}}, label: 'Ringkasan'
+                              StaticText, 0x10744ab00, {{32.0, 769.7}, {7.7, 20.3}}, label: '•'
+                              StaticText, 0x10744ac20, {{47.7, 769.7}, {347.3, 20.3}}, label: 'Selamat pagi semua, mari kita mulai rapatnya.'
+                              Other, 0x10744ad40, {{47.7, 807.0}, {43.0, 18.3}}, label: 'Dibuat AI'
+                                Image, 0x10744ae60, {{56.7, 810.7}, {9.0, 10.7}}, identifier: 'sparkles', label: 'Berkilau'
+                                StaticText, 0x10744af80, {{70.7, 808.8}, {12.0, 14.3}}, label: 'AI'
+                              Button, 0x10744b0a0, {{98.7, 794.0}, {65.0, 44.0}}, label: 'Putar dari sekitar 0 detik'
+                                Image, 0x10744b1c0, {{99.7, 809.7}, {12.3, 12.3}}, identifier: 'clock', label: 'Jam'
+                                StaticText, 0x10744b2e0, {{98.7, 794.0}, {65.0, 44.0}}, label: '~00:00'
+                              StaticText, 0x10744b550, {{32.0, 846.0}, {7.7, 20.3}}, label: '•'
+                              StaticText, 0x10744b670, {{47.7, 846.0}, {259.7, 44.7}}, label: 'Agenda hari ini adalah membahas progres proyek.'
+                              Other, 0x10744b790, {{47.7, 907.7}, {43.0, 18.3}}, label: 'Dibuat AI'
+                                Image, 0x10744b8b0, {{56.7, 911.3}, {9.0, 10.7}}, identifier: 'sparkles', label: 'Berkilau'
+                                StaticText, 0x10744b9d0, {{70.7, 909.5}, {12.0, 14.3}}, label: 'AI'
+                              Button, 0x10744baf0, {{98.7, 894.7}, {65.0, 44.0}}, label: 'Putar dari sekitar 15 detik'
+                                Image, 0x10744bc10, {{99.7, 910.3}, {12.3, 12.3}}, identifier: 'clock', label: 'Jam'
+                                StaticText, 0x10744bd30, {{98.7, 894.7}, {65.0, 44.0}}, label: '~00:15'
+                              Button, 0x10744be50, {{32.0, 950.7}, {132.0, 50.0}}, label: 'Buat ulang'
+                                Image, 0x10744bf70, {{45.7, 966.0}, {15.7, 19.0}}, identifier: 'sparkles', label: 'Berkilau'
+                                StaticText, 0x10744c090, {{32.0, 950.7}, {132.0, 50.0}}, label: 'Buat ulang'
+                              StaticText, 0x10744c1b0, {{32.0, 1004.7}, {356.0, 33.7}}, label: 'Membuat versi baru. Versi sebelumnya dan hasil edit Anda tetap tersimpan.'
+                              SegmentedControl, 0x10744c2d0, {{16.0, 434.0}, {408.0, 31.0}}
+                                Button, 0x10744c3f0, {{16.0, 434.0}, {135.0, 32.0}}, label: 'Transkrip'
+                                Button, 0x10744c510, {{152.0, 434.0}, {135.0, 32.0}}, label: 'Catatan', Selected
+                                Button, 0x10744c630, {{288.0, 434.0}, {136.0, 32.0}}, label: 'MoM'
+                          Other, 0x10744c950, {{407.0, 100.3}, {30.0, 465.7}}, label: 'Bar gulir vertikal, 3 halaman', value: 10%
+                            Other, 0x10744ca70, {{434.0, 120.0}, {3.0, 287.0}}
+                          Other, 0x10744cb90, {{407.0, 100.3}, {30.0, 465.7}}, label: 'Bar gulir vertikal, 3 halaman', value: 10%
+                            Other, 0x10744ccb0, {{434.0, 120.0}, {3.0, 287.0}}
+    Window, 0x10744cdd0, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10744cef0, {{0.0, 0.0}, {440.0, 956.0}}
+    Window, 0x10744d010, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10744d130, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10744d250, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10744d370, {{0.0, 566.0}, {440.0, 390.0}}
+          Other, 0x10744d490, {{0.0, 566.0}, {440.0, 44.0}}
+            Other, 0x10744d5b0, {{0.0, 566.0}, {440.0, 44.0}}
+              Other, 0x10744d6d0, {{0.0, 566.0}, {440.0, 44.0}}
+                Toolbar, 0x10744d7f0, {{0.0, 566.0}, {440.0, 44.0}}, identifier: 'Toolbar', label: 'Bar Alat'
+                  Other, 0x10744d910, {{0.0, 566.0}, {440.0, 44.0}}
+                    Other, 0x10744da30, {{0.0, 566.0}, {440.0, 44.0}}
+                      Button, 0x10744db50, {{376.0, 566.0}, {64.0, 44.0}}, label: 'Hapus poin'
+          Other, 0x10744dc70, {{0.0, 610.0}, {440.0, 288.0}}
+    Window, 0x10744dd90, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10744deb0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10744dfd0, {{0.0, 566.0}, {440.0, 390.0}}
+          Other, 0x10744e0f0, {{0.0, 566.0}, {440.0, 44.0}}
+          Other, 0x10744e210, {{0.0, 610.0}, {440.0, 45.0}}
+            Other, 0x10744e330, {{0.0, 610.0}, {440.0, 45.0}}
+              Other, 0x10744e450, {{0.0, 610.0}, {440.0, 45.0}}
+          Other, 0x10744e570, {{0.0, 610.0}, {440.0, 45.0}}, identifier: 'SystemInputAssistantView'
+            Other, 0x10743fea0, {{0.0, 610.0}, {440.0, 45.0}}
+              Other, 0x10743ffc0, {{0.0, 610.0}, {440.0, 45.0}}, identifier: 'CenterPageView'
+                Other, 0x1074400e0, {{0.0, 10.0}, {440.0, 1245.0}}
+                  ScrollView, 0x107440200, {{0.0, 610.0}, {440.0, 45.0}}
+                Other, 0x107440320, {{0.0, 610.0}, {440.0, 45.0}}
+                  Other, 0x107440440, {{0.0, 610.0}, {440.0, 45.0}}, label: 'Prediksi Pengetikan'
+                    Other, 0x107440560, {{0.0, 610.0}, {440.0, 45.0}}
+                      Other, 0x107440680, {{0.0, 610.0}, {440.0, 45.0}}
+                        Other, 0x1074407a0, {{0.0, 610.0}, {146.7, 45.0}}, label: '“P”'
+                        Other, 0x1074408c0, {{146.7, 610.0}, {146.7, 45.0}}
+                        Other, 0x1074409e0, {{293.3, 610.0}, {146.7, 45.0}}
+          Other, 0x107440b00, {{0.0, 655.0}, {440.0, 243.0}}
+            Other, 0x107440c20, {{0.0, 655.0}, {440.0, 301.0}}
+              Other, 0x107440d40, {{0.0, 655.0}, {440.0, 301.0}}
+                Other, 0x107440e60, {{0.0, 655.0}, {440.0, 301.0}}
+          Other, 0x107440f80, {{0.0, 655.0}, {440.0, 243.0}}
+            Keyboard, 0x1074410a0, {{0.0, 655.0}, {440.0, 243.0}}
+              Other, 0x1074411c0, {{0.0, 655.0}, {440.0, 243.0}}
+                Other, 0x1074412e0, {{0.0, 655.0}, {440.0, 243.0}}, identifier: 'UIKeyboardLayoutStar Preview'
+                  Key, 0x107441400, {{2.0, 662.0}, {43.7, 49.0}}, label: 'Q'
+                  Key, 0x10743f1f0, {{45.7, 662.0}, {43.7, 49.0}}, label: 'W'
+                  Key, 0x10743f310, {{89.3, 662.0}, {43.7, 49.0}}, label: 'E'
+                  Key, 0x10743f430, {{133.0, 662.0}, {43.3, 49.0}}, label: 'R'
+                  Key, 0x10743f550, {{176.3, 662.0}, {43.7, 49.0}}, label: 'T'
+                  Key, 0x10743f670, {{220.0, 662.0}, {43.7, 49.0}}, label: 'Y'
+                  Key, 0x10743f790, {{263.7, 662.0}, {43.3, 49.0}}, label: 'U'
+                  Key, 0x10743f8b0, {{307.0, 662.0}, {43.7, 49.0}}, label: 'I'
+                  Key, 0x10743f9d0, {{350.7, 662.0}, {43.7, 49.0}}, label: 'O'
+                  Key, 0x10744f690, {{394.3, 662.0}, {43.7, 49.0}}, label: 'P'
+                  Key, 0x10744f7b0, {{24.3, 718.0}, {43.7, 49.0}}, label: 'A'
+                  Key, 0x10744f8d0, {{68.0, 718.0}, {43.7, 49.0}}, label: 'S'
+                  Key, 0x10744f9f0, {{111.7, 718.0}, {43.7, 49.0}}, label: 'D'
+                  Key, 0x10744fb10, {{155.3, 718.0}, {43.3, 49.0}}, label: 'F'
+                  Key, 0x10744fc30, {{198.7, 718.0}, {43.7, 49.0}}, label: 'G'
+                  Key, 0x10744fd50, {{242.3, 718.0}, {43.7, 49.0}}, label: 'H'
+                  Key, 0x10744fe70, {{286.0, 718.0}, {43.3, 49.0}}, label: 'J'
+                  Key, 0x10744ff90, {{329.3, 718.0}, {43.7, 49.0}}, label: 'K'
+                  Key, 0x1074500b0, {{373.0, 718.0}, {43.7, 49.0}}, label: 'L'
+                  Button, 0x1074501d0, {{2.0, 774.0}, {53.3, 49.0}}, identifier: 'shift', label: 'shift', Selected
+                  Key, 0x1074502f0, {{68.0, 774.0}, {43.7, 49.0}}, label: 'Z'
+                  Key, 0x107450410, {{111.7, 774.0}, {43.7, 49.0}}, label: 'X'
+                  Key, 0x107450530, {{155.3, 774.0}, {43.3, 49.0}}, label: 'C'
+                  Key, 0x107450650, {{198.7, 774.0}, {43.7, 49.0}}, label: 'V'
+                  Key, 0x107450770, {{242.3, 774.0}, {43.7, 49.0}}, label: 'B'
+                  Key, 0x107450890, {{286.0, 774.0}, {43.3, 49.0}}, label: 'N'
+                  Key, 0x1074509b0, {{329.3, 774.0}, {43.7, 49.0}}, label: 'M'
+                  Key, 0x107450c20, {{384.8, 774.0}, {53.3, 49.0}}, identifier: 'delete', label: 'Hapus'
+                  Key, 0x107450d40, {{2.0, 830.0}, {110.3, 49.0}}, identifier: 'more', label: 'angka'
+                  Key, 0x107450e60, {{111.3, 830.0}, {218.0, 49.0}}, label: 'Spasi'
+                  Button, 0x107450f80, {{329.3, 830.0}, {108.7, 49.0}}, identifier: 'Return', label: 'Kembali'
+          Other, 0x1074512a0, {{0.0, 655.0}, {440.0, 301.0}}
+            Button, 0x1074513c0, {{2.5, 887.7}, {80.1, 68.7}}, label: 'Emoji'
+              StaticText, 0x1074514e0, {{2.5, 887.7}, {0.0, 0.0}}
+            Button, 0x107451600, {{357.4, 887.4}, {80.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
+              StaticText, 0x107451720, {{357.4, 887.4}, {0.0, 0.0}}
+            Button, 0x107451840, {{357.4, 887.4}, {80.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
+              StaticText, 0x107451960, {{357.4, 887.4}, {0.0, 0.0}}
 Path to element:
- →Application, 0x104322c30, pid: 72849, label: 'Phoebe'
+ →Application, 0x10a14c450, pid: 35953, label: 'Phoebe'
 Query chain:
  →Find: Target Application 'com.kolarislabs.phoebe'
   Output: {
-    Application, 0x10461f7b0, pid: 72849, label: 'Phoebe'
+    Application, 0x10a041010, pid: 35953, label: 'Phoebe'
   }
 )

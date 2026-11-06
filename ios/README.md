@@ -47,12 +47,37 @@ xcrun simctl launch "$DEV" com.kolarislabs.phoebe
 - Debug talks to `http://localhost:8080` and shows **Login pengembang / Developer login** on the sign-in step (any subject matching `[a-z0-9._-]{1,64}`). Release requires an `https` `PHOEBE_API_BASE_URL` and has no dev login.
 - Force a language: `xcrun simctl launch "$DEV" com.kolarislabs.phoebe -AppleLanguages '(en)'` (or `'(id)'`).
 - Appearance and text size: `xcrun simctl ui "$DEV" appearance dark|light`, `xcrun simctl ui "$DEV" content_size accessibility-extra-large|large`.
-- Sign in with Apple needs a signing team and a device or a simulator signed into an Apple ID.
+- Sign in with Apple needs a signing team and a device or a simulator signed into an Apple ID (see "Signing, Sign in with Apple and physical devices").
 - Recording in the simulator needs macOS microphone access for Simulator; without it the system audio unit can abort the app when capture starts.
+
+## Signing, Sign in with Apple and physical devices
+
+Simulator builds need no team: without `Config/Local.xcconfig`, `DEVELOPMENT_TEAM` is empty and the app is signed to run locally. Development keeps using the simulator with dev login.
+
+Set the Apple Developer Team ID (once it is supplied):
+
+```sh
+cd ios
+cp Config/Local.example.xcconfig Config/Local.xcconfig   # gitignored; set DEVELOPMENT_TEAM = <10-character Team ID>
+xcodegen generate
+```
+
+`project.yml` reads it through the committed `Config/Signing.xcconfig` (`#include? "Local.xcconfig"`, automatic signing). Keep the bundle id `com.kolarislabs.phoebe`.
+
+Real Sign in with Apple and testing on a device need:
+1. **Team ID** in `Config/Local.xcconfig` (above), and an Apple Developer Program membership for that team.
+2. **App ID** `com.kolarislabs.phoebe` in Certificates, Identifiers & Profiles with the **Sign in with Apple** capability enabled as a primary App ID. The entitlement `com.apple.developer.applesignin: [Default]` is already in `project.yml`.
+3. **Provisioning:** with automatic signing, Xcode registers the device and creates the development profile when you pick the device and the team. TestFlight needs an App Store Connect app record with the same bundle id and a distribution profile.
+4. **Backend `APPLE_*` env** (`../docs/backend.md` config table): `APPLE_BUNDLE_ID=com.kolarislabs.phoebe` (identity-token audience). For account deletion to revoke Apple tokens (App Store requirement, gate for external TestFlight): a **Sign in with Apple key** (`.p8`, created under Keys with Sign in with Apple enabled for this App ID) as `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, plus `TOKEN_ENC_KEY`.
+5. **No Services ID**: it is needed only for Sign in with Apple on the web or Android. The native app uses the App ID.
+6. **A reachable API:** the Debug build points at `http://localhost:8080`, which on a phone is the phone itself. Run the API somewhere the device can reach (an `https` tunnel or host) and change `PHOEBE_API_BASE_URL` for the config you install (`project.yml`, do not commit a personal URL). Release requires `https`. Dev login exists only in Debug.
+7. **A real Apple ID** signed in on the device (or on a simulator, which also needs the team). The first sign-in sends the name once; the app keeps it until the server accepts it.
+
+Sessions: the app stores a short-lived access token (server default 15 min) and a rotating refresh token in the Keychain (`AfterFirstUnlockThisDeviceOnly`). The session ends at its absolute maximum (server default 180 days after sign-in), on sign-out and on account deletion; the app then returns to sign-in with a session-ended message. A failed refresh while offline keeps you signed in. Details: `../docs/ios.md` §9.
 
 ## Screenshots (scheme `PhoebeScreenshots`, target `PhoebeUITests`)
 
-`ScreenshotTests` walks onboarding, Library, Meeting detail (Transkrip / Catatan / MoM), the MoM editor, Export, Settings and Recording in Indonesian, signing in with dev login subject `shots`. It needs an API on `localhost:8080` that has a meeting titled "Rapat anggaran Q4" with transcript, notes and MoM for that user. `tools/mock_api.py` serves exactly that fixture (in-memory, api.md shapes): run `python3 tools/mock_api.py` in another terminal (stop anything else on port 8080 first).
+`ScreenshotTests` walks onboarding, Library, Meeting detail (Transkrip / Catatan / MoM), the MoM editor, Export, Settings and Recording in Indonesian, signing in with dev login subject `shots`. It needs an API on `localhost:8080` that has a meeting titled "Rapat anggaran Q4" with transcript, notes and MoM for that user. `tools/mock_api.py` serves exactly that fixture (in-memory, api.md shapes: chunk-timed transcript with 2 uncertain segments, approximate refs, 27 of 30 AI generations left, token-pair auth incl. `/v1/auth/refresh`): run `python3 tools/mock_api.py` in another terminal (stop anything else on port 8080 first).
 
 ```sh
 cd ios
@@ -79,22 +104,23 @@ Needs the real api + worker on `localhost:8080` with fake providers and dev logi
 
 | Test | Covers |
 |---|---|
-| `testImportToExport` | dev login → import m4a from Files → upload → transcript → notes → Buat MoM → edit → Tandai sudah ditinjau → PDF export + share sheet → Library shows "Sudah ditinjau" → personal note → rename → delete meeting → Settings usage |
-| `testRestoreFromServer` | fresh install, existing account: Library restored from server (MoM draft chip) → search → transcript → server audio playback → new tag → delete account |
+| `testImportToExport` | dev login → import m4a from Files → upload → transcript (approximate `~mm:ss` times, chunk-timing note) → notes (approximate source ref) → Buat MoM → edit → Tandai sudah ditinjau → PDF export + share sheet → Library shows "Sudah ditinjau" → personal note → rename → delete meeting → Settings usage + "30 generasi AI per 24 jam · Sisa 28" |
+| `testRestoreFromServer` | fresh install, existing account: Library restored from server (MoM draft chip) → search → transcript → uncertain segment marker + count → "Teks sudah benar" resolves it → server audio playback → new tag → delete account |
+| `testAISlotChoice` | account with every AI generation slot used: import note before upload → upload auto-start blocked (`transcription_blocked`) → "Slot AI belum tersedia" sheet (Sisa 0, next slot) → Tunggu slot AI (no transcription) → Transkrip saja → transcript, notes not generated; skipped unless `PHOEBE_E2E_BLOCKED_SUBJECT` is set |
 | `testSignOut` | sign out returns to sign-in, app keeps running |
 | `testRecordShortMeeting` | 12 s live recording; skipped unless `PHOEBE_E2E_RECORD=1` (needs host microphone access for Simulator) |
 
 ```sh
 cd ios
-DEV=<simulator udid>; SUBJECT=e2e-restore-$(date +%s)
-tools/e2e_seed.sh "$DEV" "$SUBJECT"      # Files import fixture + seeded server meeting
+DEV=<simulator udid>; TS=$(date +%s); SUBJECT=e2e-restore-$TS; BLOCKED=e2e-blocked-$TS
+tools/e2e_seed.sh "$DEV" "$SUBJECT" "$BLOCKED"   # Files import fixture, seeded server meeting (s2 uncertain), BLOCKED's AI slots filled (SQL via root compose postgres)
 xcodebuild -project Phoebe.xcodeproj -scheme PhoebeScreenshots \
   -destination "platform=iOS Simulator,id=$DEV" -derivedDataPath /tmp/phoebe-dd build-for-testing
 xcrun simctl uninstall "$DEV" com.kolarislabs.phoebe; xcrun simctl keychain "$DEV" reset
-TEST_RUNNER_PHOEBE_E2E_RESTORE_SUBJECT=$SUBJECT TEST_RUNNER_PHOEBE_SHOTS_DIR="$PWD/screenshots/e2e" \
+TEST_RUNNER_PHOEBE_E2E_RESTORE_SUBJECT=$SUBJECT TEST_RUNNER_PHOEBE_E2E_BLOCKED_SUBJECT=$BLOCKED TEST_RUNNER_PHOEBE_SHOTS_DIR="$PWD/screenshots/e2e" \
   xcodebuild -project Phoebe.xcodeproj -scheme PhoebeScreenshots \
   -destination "platform=iOS Simulator,id=$DEV" -derivedDataPath /tmp/phoebe-dd \
   -only-testing:PhoebeUITests/E2EFlowTests test-without-building
 ```
 
-`testRestoreFromServer` deletes the seeded account, so seed a new subject for every run.
+`testRestoreFromServer` deletes the seeded account and `testAISlotChoice` adds a meeting to its account, so seed new subjects for every run. `TEST_RUNNER_PHOEBE_SHOTS_VARIANT=<light|dark|xl>` prefixes the shot names; `screenshots/<variant>-13…15-*.png` come from `testAISlotChoice` run once per variant (appearance and text size set as for `ScreenshotTests`). The seed's SQL defaults to `docker compose exec -T postgres psql`; set `PHOEBE_PSQL` (e.g. `"psql $DATABASE_URL"`) for another database.

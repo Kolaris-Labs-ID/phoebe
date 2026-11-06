@@ -17,23 +17,30 @@ import (
 	"phoebe/internal/usage"
 )
 
-// NotesSpec is the generate_notes job (backend.md §5.2); permanent failure → notes_failed.
+// NotesSpec is the generate_notes job (backend.md §5.2); permanent failure releases the
+// generation slot → notes_failed.
 func (s *Service) NotesSpec() jobs.Spec {
 	return jobs.Spec{
 		Handler:  func(ctx context.Context, j *jobs.Job) error { return s.generate(ctx, j, KindAINotes) },
 		Deadline: s.deadline,
 		OnFailure: func(ctx context.Context, tx pgx.Tx, j *jobs.Job, _ string) error {
+			if err := usage.ReleaseSlot(ctx, tx, j.ID); err != nil {
+				return err
+			}
 			_, err := meetings.Transition(ctx, tx, *j.MeetingID, meetings.NotesFailed)
 			return err
 		},
 	}
 }
 
-// MoMSpec is the generate_mom job; permanent failure changes nothing besides job status.
+// MoMSpec is the generate_mom job; permanent failure only releases the generation slot.
 func (s *Service) MoMSpec() jobs.Spec {
 	return jobs.Spec{
 		Handler:  func(ctx context.Context, j *jobs.Job) error { return s.generate(ctx, j, KindMoM) },
 		Deadline: s.deadline,
+		OnFailure: func(ctx context.Context, tx pgx.Tx, j *jobs.Job, _ string) error {
+			return usage.ReleaseSlot(ctx, tx, j.ID)
+		},
 	}
 }
 
@@ -46,7 +53,7 @@ func (s *Service) deadline(j *jobs.Job) time.Duration {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	segs, err := loadSegments(ctx, s.pool, p.TranscriptRevisionID)
+	segs, _, err := loadSegments(ctx, s.pool, p.TranscriptRevisionID)
 	if err != nil {
 		return limit
 	}
@@ -63,12 +70,13 @@ func promptSegments(segs []segment) []promptSegment {
 }
 
 type genInputs struct {
-	startedAt *time.Time
-	meeting   promptMeeting
-	info      MeetingInfo
-	segs      []segment
-	notes     *ManualNotes
-	aiNotes   json.RawMessage
+	startedAt   *time.Time
+	meeting     promptMeeting
+	info        MeetingInfo
+	segs        []segment
+	approximate bool
+	notes       *ManualNotes
+	aiNotes     json.RawMessage
 }
 
 // load reads the meeting metadata and the pinned source revisions. A tombstoned or purged
@@ -90,7 +98,7 @@ func (s *Service) load(ctx context.Context, meetingID string, kind Kind, p Paylo
 	in.meeting = promptMeeting{Title: in.info.Title, Date: dateString(meetingDate(in.startedAt, in.info.Timezone)),
 		Timezone: in.info.Timezone, Participants: in.info.Participants}
 
-	if in.segs, err = loadSegments(ctx, s.pool, p.TranscriptRevisionID); err != nil {
+	if in.segs, in.approximate, err = loadSegments(ctx, s.pool, p.TranscriptRevisionID); err != nil {
 		return nil, s.missing(ctx, meetingID, err)
 	}
 	if p.ManualNotesRevisionID != nil {
@@ -120,6 +128,13 @@ func (s *Service) missing(ctx context.Context, meetingID string, err error) erro
 		return jobs.ErrLeaseLost
 	}
 	return jobs.Permanent(jobs.CatInternal, "pinned revision missing")
+}
+
+func task(kind Kind) ai.Task {
+	if kind == KindMoM {
+		return ai.TaskMoM
+	}
+	return ai.TaskNotes
 }
 
 func (s *Service) generate(ctx context.Context, j *jobs.Job, kind Kind) error {
@@ -153,7 +168,7 @@ func (s *Service) generate(ctx context.Context, j *jobs.Job, kind Kind) error {
 			return err
 		}
 		start := time.Now()
-		res, err := s.llm.Complete(ctx, systemPrompt(kind), user)
+		res, err := s.llm.Complete(ai.WithTask(ctx, task(kind)), systemPrompt(kind), user)
 		latency := time.Since(start).Milliseconds()
 		if err == nil {
 			var derr error
@@ -188,6 +203,7 @@ func (s *Service) generate(ctx context.Context, j *jobs.Job, kind Kind) error {
 	}
 
 	src := newSources(in.segs, in.notes, in.info.Participants, meetingDate(in.startedAt, in.info.Timezone), p.Language)
+	src.approximate = in.approximate
 	var c Content
 	dropped := 0
 	if kind == KindMoM {
@@ -224,6 +240,9 @@ func (s *Service) generate(ctx context.Context, j *jobs.Job, kind Kind) error {
 		}
 		r.Number = d.current + 1
 		if err := commitRevision(ctx, tx, meetingID, kind, d, r, c); err != nil {
+			return err
+		}
+		if err := usage.ConsumeSlot(ctx, tx, j.ID); err != nil {
 			return err
 		}
 		if kind == KindMoM {

@@ -1,12 +1,8 @@
 package transcripts
 
 import (
-	"bytes"
-	"context"
 	"encoding/json"
 	"errors"
-	"io"
-	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -15,7 +11,6 @@ import (
 	"phoebe/internal/ai"
 	"phoebe/internal/ai/fake"
 	"phoebe/internal/apperr"
-	"phoebe/internal/audio"
 	"phoebe/internal/config"
 	"phoebe/internal/db"
 	"phoebe/internal/ids"
@@ -30,29 +25,34 @@ import (
 func strp(s string) *string { return &s }
 
 func TestNormalize(t *testing.T) {
-	seg := func(start, end float64, text string) rawMS {
-		return rawMS{startMS: secToMS(start), endMS: secToMS(end), seg: ai.RawSegment{StartSec: start, EndSec: end, Text: text}}
+	seg := func(start, end int64, text string) ai.Segment {
+		return ai.Segment{StartMS: start, EndMS: end, Text: text}
 	}
-	raw := []rawMS{
-		seg(5, 6.0005, "  dua  "),
-		seg(0, 1.2344, "satu"),
-		seg(7, 8, "   "),
-		{startMS: 8000, endMS: 9000, seg: ai.RawSegment{StartSec: 8, EndSec: 9, Text: "halu", NoSpeechProb: 0.9, AvgLogprob: -1.5}},
-		{startMS: 8000, endMS: 9000, seg: ai.RawSegment{StartSec: 8, EndSec: 9, Text: "ulang ulang", CompressionRatio: 3}},
-		{startMS: 8000, endMS: 9000, seg: ai.RawSegment{StartSec: 8, EndSec: 9, Text: "kept", NoSpeechProb: 0.9, AvgLogprob: -0.5}},
-		seg(9.5, 10.7, "akhir"),
+	low := func(start, end int64, text string) ai.Segment {
+		return ai.Segment{StartMS: start, EndMS: end, Text: text, Uncertain: true, UncertainReason: ai.UncertainLowConfidence}
+	}
+	raw := []ai.Segment{
+		seg(5000, 6001, "  dua  "),
+		seg(0, 1234, "satu"),
+		seg(7000, 8000, "   "),
+		low(8000, 9000, "ragu"),
+		seg(9500, 10700, "akhir"),
 	}
 	got, err := normalize(raw, 10000)
 	if err != nil {
 		t.Fatal(err)
 	}
-	want := []Segment{{"s1", 0, 1234, "satu"}, {"s2", 5000, 6001, "dua"}, {"s3", 8000, 9000, "kept"}, {"s4", 9500, 10000, "akhir"}}
+	reason := ai.UncertainLowConfidence
+	want := []Segment{{"s1", 0, 1234, "satu", false, nil}, {"s2", 5000, 6001, "dua", false, nil},
+		{"s3", 8000, 9000, "ragu", true, &reason}, {"s4", 9500, 10000, "akhir", false, nil}}
 	if len(got) != len(want) {
 		t.Fatal(got)
 	}
 	for i := range want {
-		if got[i] != want[i] {
-			t.Fatalf("%d: %+v want %+v", i, got[i], want[i])
+		g, w := got[i], want[i]
+		if g.ID != w.ID || g.StartMS != w.StartMS || g.EndMS != w.EndMS || g.Text != w.Text || g.Uncertain != w.Uncertain ||
+			(g.UncertainReason == nil) != (w.UncertainReason == nil) || (g.UncertainReason != nil && *g.UncertainReason != *w.UncertainReason) {
+			t.Fatalf("%d: %+v want %+v", i, g, w)
 		}
 	}
 
@@ -63,21 +63,21 @@ func TestNormalize(t *testing.T) {
 		}
 		return je.Category, je.Permanent
 	}
-	if _, err := normalize([]rawMS{seg(0, 1, ""), {seg: ai.RawSegment{Text: "x", CompressionRatio: 2.5}}}, 10000); err == nil {
+	if _, err := normalize([]ai.Segment{seg(0, 1000, ""), seg(1000, 2000, " \n ")}, 10000); err == nil {
 		t.Fatal("expected no_speech")
 	} else if c, p := category(err); c != jobs.CatNoSpeech || !p {
 		t.Fatal(c, p)
 	}
-	if _, err := normalize([]rawMS{seg(11.001, 12, "lewat")}, 10000); err == nil {
+	if _, err := normalize([]ai.Segment{seg(11001, 12000, "lewat")}, 10000); err == nil {
 		t.Fatal("expected overrun")
 	} else if c, p := category(err); c != jobs.CatAudioUnreadable || !p {
 		t.Fatal(c, p)
 	}
-	if got, err := normalize([]rawMS{seg(10.9, 11.5, "pas")}, 10000); err != nil || got[0].StartMS != 10000 || got[0].EndMS != 10000 {
+	if got, err := normalize([]ai.Segment{seg(10900, 11500, "pas")}, 10000); err != nil || got[0].StartMS != 10000 || got[0].EndMS != 10000 {
 		t.Fatal(got, err)
 	}
-	for _, bad := range []rawMS{seg(3, 2, "mundur"), seg(-1, 2, "negatif")} {
-		if _, err := normalize([]rawMS{bad}, 10000); err == nil {
+	for _, bad := range []ai.Segment{seg(3000, 2000, "mundur"), seg(-1000, 2000, "negatif")} {
+		if _, err := normalize([]ai.Segment{bad}, 10000); err == nil {
 			t.Fatal("expected invalid_output")
 		} else if c, p := category(err); c != jobs.CatInvalidOutput || p {
 			t.Fatal(c, p)
@@ -124,8 +124,10 @@ func TestTranscribeSuccess(t *testing.T) {
 			t.Fatalf("segment %d: %+v", i, s)
 		}
 	}
-	if e.count(t, `SELECT count(*) FROM audio_assets WHERE id = $1 AND retain_until > now() + interval '29 days'`, assetID) != 1 {
-		t.Fatal("retain_until not set")
+	if e.count(t, `SELECT count(*) FROM audio_assets WHERE id = $1
+		AND retain_until BETWEEN now() + make_interval(days => $2) - interval '1 minute' AND now() + make_interval(days => $2)`,
+		assetID, e.cfg.AudioRetentionDays) != 1 || e.cfg.AudioRetentionDays != 30 {
+		t.Fatal("retain_until must be AUDIO_RETENTION_DAYS after transcription success")
 	}
 	if !strings.Contains(e.str(t, `SELECT body FROM search_documents WHERE meeting_id = $1 AND source = 'transcript'`, mid), "Kita sepakat rilis hari Jumat.") {
 		t.Fatal("search body")
@@ -178,6 +180,17 @@ func TestStartIdempotency(t *testing.T) {
 	}
 	if _, _, err := e.svc.Start(ctx, uid, mid, ids.New(), StartInput{Language: strp("fr")}, []byte(`{"language":"fr"}`)); code(err) != apperr.ValidationFailed {
 		t.Fatal(err)
+	}
+	nuid, nmid, _ := e.meeting(t, 3600, 60_000)
+	nkey := ids.New()
+	jn, created, err := e.svc.Start(ctx, nuid, nmid, nkey, StartInput{}, []byte(`null`))
+	if err != nil || !created {
+		t.Fatal("null body behaves like {}", err, created)
+	}
+	for _, b := range [][]byte{nil, []byte(`{}`), []byte(` null `)} {
+		if j, created, err := e.svc.Start(ctx, nuid, nmid, nkey, StartInput{}, b); err != nil || created || j.ID != jn.ID {
+			t.Fatalf("%q must replay the null-body start: %v %v", b, err, created)
+		}
 	}
 	var p payload
 	if err := e.job(t, j1.ID).DecodePayload(&p); err != nil || p.Language != "id" || p.DurationMS != 60_000 {
@@ -302,7 +315,7 @@ func TestStartInTx(t *testing.T) {
 		if err := db.LockMeeting(ctx, tx, mid, uid); err != nil {
 			return err
 		}
-		if _, _, err := e.svc.StartInTx(ctx, tx, uid, mid, key, "auto"); code(err) != apperr.QuotaExceeded {
+		if _, _, err := e.svc.StartInTx(ctx, tx, uid, mid, key, "auto", NotesAuto); code(err) != apperr.QuotaExceeded {
 			t.Fatal(err)
 		}
 		_, err := tx.Exec(ctx, `UPDATE meetings SET title = 'tx still usable' WHERE id = $1`, mid)
@@ -321,7 +334,7 @@ func TestStartInTx(t *testing.T) {
 		if err := db.LockMeeting(ctx, tx, mid, uid); err != nil {
 			return err
 		}
-		j, created, err := e.svc.StartInTx(ctx, tx, uid, mid, key, "auto")
+		j, created, err := e.svc.StartInTx(ctx, tx, uid, mid, key, "auto", NotesAuto)
 		if err != nil || !created {
 			t.Fatal(err, created)
 		}
@@ -334,6 +347,13 @@ func TestStartInTx(t *testing.T) {
 	j, created, err := e.svc.Start(ctx, uid, mid, key, StartInput{Language: strp("auto")}, []byte(`{"language": "auto"}`))
 	if err != nil || created || j.ID != auto.ID {
 		t.Fatal("explicit confirm", err, created)
+	}
+	j, created, err = e.svc.Start(ctx, uid, mid, key, StartInput{Language: strp("auto"), Notes: strp(NotesAuto)}, []byte(`{"notes":"auto","language": "auto"}`))
+	if err != nil || created || j.ID != auto.ID {
+		t.Fatal("explicit confirm with notes", err, created)
+	}
+	if _, _, err := e.svc.Start(ctx, uid, mid, key, StartInput{Language: strp("auto"), Notes: strp(NotesSkip)}, []byte(`{"notes":"skip","language": "auto"}`)); code(err) != apperr.IdempotencyKeyReused {
+		t.Fatal("skip with the auto key", err)
 	}
 	if _, _, err := e.svc.Start(ctx, uid, mid, key, StartInput{}, nil); code(err) != apperr.IdempotencyKeyReused {
 		t.Fatal(err)
@@ -362,14 +382,9 @@ func assertFailed(t *testing.T, e *env, jobID, mid, category string, attempts in
 }
 
 func TestNoSpeech(t *testing.T) {
-	cases := map[string][]ai.RawSegment{
+	cases := map[string][]ai.Segment{
 		"zero segments": nil,
-		"no_speech_prob": {
-			{StartSec: 0, EndSec: 2, Text: "Terima kasih telah menonton", NoSpeechProb: 0.9, AvgLogprob: -1.5},
-			{StartSec: 2, EndSec: 4, Text: "Terima kasih", NoSpeechProb: 0.9, AvgLogprob: -1.5},
-		},
-		"compression_ratio": {{StartSec: 0, EndSec: 4, Text: "ya ya ya ya ya ya", CompressionRatio: 3}},
-		"empty text":        {{StartSec: 0, EndSec: 4, Text: "   "}},
+		"empty text":    {{StartMS: 0, EndMS: 4000, Text: "   "}},
 	}
 	for name, segs := range cases {
 		t.Run(name, func(t *testing.T) {
@@ -388,8 +403,8 @@ func TestNoSpeech(t *testing.T) {
 }
 
 func TestProviderOverrun(t *testing.T) {
-	e := newEnv(t, &fake.STT{Results: []ai.STTResult{{Segments: []ai.RawSegment{
-		{StartSec: 0, EndSec: 3, Text: "halo"}, {StartSec: 6.5, EndSec: 9, Text: "lewat akhir"},
+	e := newEnv(t, &fake.STT{Results: []ai.STTResult{{Segments: []ai.Segment{
+		{StartMS: 0, EndMS: 3000, Text: "halo"}, {StartMS: 6500, EndMS: 9000, Text: "lewat akhir"},
 	}}}}, nil)
 	uid, mid, _ := e.meeting(t, 3600, 5000)
 	jobID := e.start(t, uid, mid)
@@ -400,30 +415,35 @@ func TestProviderOverrun(t *testing.T) {
 	}
 }
 
+// The adapter times out each provider request itself; only the whole-attempt deadline is the runner's timeout.
 func TestProviderTimeout(t *testing.T) {
-	e := newEnv(t, &fake.STT{Block: true}, func(c *config.Config) { c.STTRequestTimeout = 50 * time.Millisecond })
+	e := newEnv(t, &fake.STT{Block: true}, func(c *config.Config) { c.JobTimeoutTranscribeMax = 50 * time.Millisecond })
 	uid, mid, _ := e.meeting(t, 3600, 5000)
 	jobID := e.start(t, uid, mid)
+	if d := e.svc.deadline(e.job(t, jobID)); d != 50*time.Millisecond {
+		t.Fatal("deadline", d)
+	}
 	for i := 1; i <= 2; i++ {
 		e.run(t)
 		j := e.job(t, jobID)
-		if j.Status != jobs.StatusQueued || j.Attempts != i || *j.LastErrorCategory != jobs.CatProviderTimeout || !j.RunAfter.After(j.UpdatedAt.Add(-time.Second)) {
+		if j.Status != jobs.StatusQueued || j.Attempts != i || *j.LastErrorCategory != jobs.CatTimeout || !j.RunAfter.After(j.UpdatedAt.Add(-time.Second)) {
 			t.Fatalf("attempt %d: %+v", i, j)
 		}
 		if e.state(t, mid) != meetings.StateTranscribing ||
-			e.count(t, `SELECT count(*) FROM quota_reservations WHERE job_id = $1 AND status = 'reserved'`, jobID) != 1 {
-			t.Fatal("retry must keep reservation and state")
+			e.count(t, `SELECT count(*) FROM quota_reservations WHERE job_id = $1 AND status = 'reserved'`, jobID) != 1 ||
+			e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE transcribe_job_id = $1 AND status = 'reserved'`, jobID) != 1 {
+			t.Fatal("retry must keep reservation, slot and state")
 		}
 	}
 	e.run(t)
-	assertFailed(t, e, jobID, mid, jobs.CatProviderTimeout, 3)
+	assertFailed(t, e, jobID, mid, jobs.CatTimeout, 3)
 	if e.count(t, `SELECT count(*) FROM ai_calls WHERE job_id = $1 AND outcome = 'error' AND error_category = 'provider_timeout'`, jobID) != 3 {
 		t.Fatal("ai_calls")
 	}
 }
 
 func TestInvalidOutputRetried(t *testing.T) {
-	e := newEnv(t, &fake.STT{Results: []ai.STTResult{{Segments: []ai.RawSegment{{StartSec: 3, EndSec: 1, Text: "mundur"}}}}}, nil)
+	e := newEnv(t, &fake.STT{Results: []ai.STTResult{{Segments: []ai.Segment{{StartMS: 3000, EndMS: 1000, Text: "mundur"}}}}}, nil)
 	uid, mid, _ := e.meeting(t, 3600, 5000)
 	jobID := e.start(t, uid, mid)
 	e.run(t)
@@ -488,86 +508,6 @@ func TestDeleteDuringJob(t *testing.T) {
 		e.count(t, `SELECT count(*) FROM quota_reservations WHERE job_id = $1 AND status = 'released'`, jobID) != 1 ||
 		e.str(t, `SELECT status FROM jobs WHERE id = $1`, jobID) != jobs.StatusCanceled {
 		t.Fatal("finalize wrote after delete")
-	}
-}
-
-type recordingSTT struct {
-	*fake.STT
-	mu        sync.Mutex
-	filenames []string
-	types     []string
-	durations []int64
-}
-
-func (r *recordingSTT) Transcribe(c context.Context, in ai.STTInput) (ai.STTResult, error) {
-	b, err := io.ReadAll(in.Reader)
-	if err != nil {
-		return ai.STTResult{}, err
-	}
-	ct, d, err := audio.Probe(bytes.NewReader(b), int64(len(b)))
-	if err != nil || ct != audio.M4A {
-		return ai.STTResult{}, errors.New("chunk is not a valid m4a")
-	}
-	r.mu.Lock()
-	r.filenames = append(r.filenames, in.Filename)
-	r.types = append(r.types, in.ContentType)
-	r.durations = append(r.durations, d)
-	r.mu.Unlock()
-	return r.STT.Transcribe(c, in)
-}
-
-func TestChunkedTranscription(t *testing.T) {
-	if err := audio.CheckFFmpeg(ctx, "ffmpeg"); err != nil {
-		t.Fatal(err)
-	}
-	pool := testutil.DB(t)
-	store := testutil.Storage(t)
-	cfg := testutil.Config(t)
-	cfg.STTProvider = "openai"
-	cfg.STTMaxFileBytes = 100_000
-	cfg.STTChunkSeconds = 600
-	rec := &recordingSTT{STT: &fake.STT{}}
-	log := testutil.DiscardLogger()
-	e := &env{pool: pool, store: store, cfg: cfg, stt: rec.STT}
-	e.svc = New(pool, cfg, store, usage.New(pool, cfg, log), rec, log)
-	e.runner = jobs.NewRunner(pool, log, jobs.RunnerConfig{WorkerID: "test", Lease: time.Minute, RetryBase: time.Millisecond})
-	e.runner.Register(jobs.TypeTranscribe, e.svc.TranscribeSpec())
-
-	uid, mid, _ := e.meeting(t, 7200, 25*60*1000)
-	jobID := e.start(t, uid, mid)
-	if d := e.svc.deadline(e.job(t, jobID)); d != 3*cfg.STTRequestTimeout+5*time.Minute {
-		t.Fatal("deadline", d)
-	}
-	e.run(t)
-	if j := e.job(t, jobID); j.Status != jobs.StatusSucceeded {
-		t.Fatalf("%+v %v", j, *j.LastErrorDetail)
-	}
-	if rec.Calls() != 3 || rec.types[0] != audio.ChunkContentType || rec.filenames[2] != "chunk_002.m4a" {
-		t.Fatal(rec.Calls(), rec.types, rec.filenames)
-	}
-	for i, want := range []int64{600_000, 600_000, 300_000} {
-		if d := rec.durations[i]; d < want-200 || d > want+200 {
-			t.Fatalf("chunk %d probed %d ms", i, d)
-		}
-	}
-	rev, err := e.svc.Current(ctx, uid, mid)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if len(rev.Segments) != 100 {
-		t.Fatal(len(rev.Segments))
-	}
-	for i, s := range rev.Segments {
-		if s.ID != "s"+strconv.Itoa(i+1) || s.StartMS != int64(i)*15000 || (i > 0 && s.StartMS < rev.Segments[i-1].StartMS) {
-			t.Fatalf("segment %d: %+v", i, s)
-		}
-	}
-	if rev.Segments[40].StartMS != 600_000 || rev.Segments[80].StartMS != 1_200_000 || rev.Segments[99].EndMS != 1_500_000 {
-		t.Fatal(rev.Segments[40], rev.Segments[80], rev.Segments[99])
-	}
-	if e.count(t, `SELECT count(*) FROM ai_calls WHERE job_id = $1 AND outcome = 'ok'`, jobID) != 3 ||
-		e.count(t, `SELECT sum(audio_ms)::int FROM ai_calls WHERE job_id = $1`, jobID) != 1_500_000 {
-		t.Fatal("ai_calls")
 	}
 }
 
@@ -710,4 +650,161 @@ func TestChangeDetection(t *testing.T) {
 		t.Fatal(err)
 	}
 	step("correction")
+}
+
+func (e *env) fillSlots(t *testing.T, uid string, n int) {
+	t.Helper()
+	e.exec(t, `INSERT INTO ai_generation_slots (user_id, status, consumed_at) SELECT $1, 'consumed', now() FROM generate_series(1, $2)`, uid, n)
+}
+
+func TestStartAutoNotesSlot(t *testing.T) {
+	e := newEnv(t, nil, func(c *config.Config) { c.AIGenerationLimit = 2 })
+	uid, mid, _ := e.meeting(t, 3600, 30_000)
+	jobID := e.start(t, uid, mid)
+	if e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE transcribe_job_id = $1 AND meeting_id = $2 AND job_id IS NULL AND status = 'reserved'`, jobID, mid) != 1 {
+		t.Fatal("auto notes slot not reserved with the transcription")
+	}
+	e.run(t)
+	notes := e.str(t, `SELECT id::text FROM jobs WHERE meeting_id = $1 AND type = 'generate_notes'`, mid)
+	if e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE transcribe_job_id = $1 AND job_id = $2 AND status = 'reserved'`, jobID, notes) != 1 ||
+		e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, uid) != 1 {
+		t.Fatal("slot not handed to the notes job")
+	}
+}
+
+func TestStartGenerationLimit(t *testing.T) {
+	e := newEnv(t, nil, func(c *config.Config) { c.AIGenerationLimit = 3 })
+	uid, mid, _ := e.meeting(t, 3600, 30_000)
+	e.fillSlots(t, uid, 3)
+
+	key := ids.New()
+	_, _, err := e.svc.Start(ctx, uid, mid, key, StartInput{}, nil)
+	d := details(err)
+	if code(err) != apperr.AIGenerationLimit || d["limit"] != 3 || d["remaining"] != 0 || d["next_slot_at"] == nil {
+		t.Fatal(err, d)
+	}
+	if e.count(t, `SELECT count(*) FROM jobs WHERE meeting_id = $1`, mid) != 0 ||
+		e.count(t, `SELECT count(*) FROM quota_reservations WHERE user_id = $1`, uid) != 0 ||
+		e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, uid) != 3 || e.state(t, mid) != meetings.StateUploaded {
+		t.Fatal("429 reserved something")
+	}
+	// The 429 stored nothing for the key: the same request may be retried.
+	if _, _, err := e.svc.Start(ctx, uid, mid, key, StartInput{}, nil); code(err) != apperr.AIGenerationLimit {
+		t.Fatal(err)
+	}
+
+	// Transcription only: a new intent with a new key.
+	j, created, err := e.svc.Start(ctx, uid, mid, ids.New(), StartInput{Notes: strp(NotesSkip)}, []byte(`{"notes":"skip"}`))
+	if err != nil || !created {
+		t.Fatal(err, created)
+	}
+	if e.count(t, `SELECT count(*) FROM quota_reservations WHERE job_id = $1 AND status = 'reserved' AND seconds = 30`, j.ID) != 1 ||
+		e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE user_id = $1`, uid) != 3 {
+		t.Fatal("skip must reserve quota and no slot")
+	}
+	e.run(t)
+	if e.job(t, j.ID).Status != jobs.StatusSucceeded || e.state(t, mid) != meetings.StateTranscriptReady ||
+		e.count(t, `SELECT count(*) FROM jobs WHERE meeting_id = $1 AND type = 'generate_notes'`, mid) != 0 ||
+		e.count(t, `SELECT count(*) FROM quota_reservations WHERE job_id = $1 AND status = 'consumed'`, j.ID) != 1 {
+		t.Fatal("skip: transcript_ready without notes")
+	}
+	if _, _, err := e.svc.Start(ctx, uid, mid, ids.New(), StartInput{Notes: strp("later")}, []byte(`{"notes":"later"}`)); code(err) != apperr.ValidationFailed {
+		t.Fatal(err)
+	}
+}
+
+func TestNoSpeechReleasesSlot(t *testing.T) {
+	e := newEnv(t, &fake.STT{Results: []ai.STTResult{{Language: "id", AudioMS: 5000}}}, nil)
+	uid, mid, _ := e.meeting(t, 3600, 5000)
+	jobID := e.start(t, uid, mid)
+	e.run(t)
+	assertFailed(t, e, jobID, mid, jobs.CatNoSpeech, 1)
+	if e.count(t, `SELECT count(*) FROM ai_generation_slots WHERE transcribe_job_id = $1 AND status = 'released'`, jobID) != 1 {
+		t.Fatal("slot not released")
+	}
+	u, err := usage.New(e.pool, e.cfg, testutil.DiscardLogger()).Get(ctx, uid)
+	if err != nil || u.AIGenerations.Remaining != e.cfg.AIGenerationLimit {
+		t.Fatal(u.AIGenerations, err)
+	}
+}
+
+func TestTimingAndUncertainPersisted(t *testing.T) {
+	for _, tm := range []string{ai.TimingChunk, ai.TimingSegment} {
+		t.Run(tm, func(t *testing.T) {
+			e := newEnv(t, &fake.STT{Timing: tm, Uncertain: []int{1, 3}}, nil)
+			uid, mid, _ := e.meeting(t, 3600, 60_000)
+			e.start(t, uid, mid)
+			e.run(t)
+			rev, err := e.svc.Current(ctx, uid, mid)
+			if err != nil || rev.Timing != tm {
+				t.Fatal(rev, err)
+			}
+			for i, s := range rev.Segments {
+				want := i == 1 || i == 3
+				if s.Uncertain != want || (want != (s.UncertainReason != nil)) || (want && *s.UncertainReason != ai.UncertainLowConfidence) {
+					t.Fatalf("segment %d: %+v", i, s)
+				}
+			}
+			b, _ := json.Marshal(rev)
+			if !strings.Contains(string(b), `"timing":"`+tm+`"`) || !strings.Contains(string(b), `"uncertain":false,"uncertain_reason":null`) ||
+				!strings.Contains(string(b), `"uncertain":true,"uncertain_reason":"low_confidence"`) {
+				t.Fatal(string(b))
+			}
+
+			// s2 text changed, s4 confirmed as-is, s1 resent unchanged: only s2 and s4 resolve.
+			in, body := correction(1, ids.New(), Edit{SegmentID: strp("s2"), Text: strp("Agenda dikoreksi.")},
+				Edit{SegmentID: strp("s1"), Text: strp(rev.Segments[0].Text)})
+			in.ResolvedUncertainSegmentIDs = []string{"s4"}
+			body, _ = json.Marshal(in)
+			cor, _, err := e.svc.Correct(ctx, uid, mid, in, body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if cor.Timing != tm {
+				t.Fatal("correction must inherit timing", cor.Timing)
+			}
+			for i, s := range cor.Segments {
+				if s.Uncertain || s.UncertainReason != nil {
+					t.Fatalf("segment %d still uncertain: %+v", i, s)
+				}
+			}
+			if r1, _ := e.svc.GetRevision(ctx, uid, mid, 1); !r1.Segments[1].Uncertain || !r1.Segments[3].Uncertain {
+				t.Fatal("original changed")
+			}
+			list, _, err := e.svc.ListRevisions(ctx, uid, mid, 10, nil)
+			if err != nil || list[0].Timing != tm || list[1].Timing != tm {
+				t.Fatal(list, err)
+			}
+		})
+	}
+}
+
+func TestCorrectionResolveOnly(t *testing.T) {
+	e := newEnv(t, &fake.STT{Uncertain: []int{0}}, nil)
+	uid, mid, _ := e.meeting(t, 3600, 30_000)
+	e.start(t, uid, mid)
+	e.run(t)
+	in := CorrectionInput{ExpectedRevision: new(int), MutationID: strp(ids.New()), ResolvedUncertainSegmentIDs: []string{"s1"}}
+	*in.ExpectedRevision = 1
+	body, _ := json.Marshal(in)
+	rev, created, err := e.svc.Correct(ctx, uid, mid, in, body)
+	if err != nil || !created || rev.Segments[0].Uncertain {
+		t.Fatal(rev, err)
+	}
+	for name, c := range map[string]struct {
+		ids  []string
+		path string
+		why  string
+	}{
+		"unknown":   {[]string{"s9"}, "/resolved_uncertain_segment_ids/0", apperr.ReasonNotFound},
+		"duplicate": {[]string{"s1", "s1"}, "/resolved_uncertain_segment_ids/1", apperr.ReasonDuplicate},
+	} {
+		in := CorrectionInput{ExpectedRevision: new(int), MutationID: strp(ids.New()), ResolvedUncertainSegmentIDs: c.ids}
+		*in.ExpectedRevision = 2
+		body, _ := json.Marshal(in)
+		_, _, err := e.svc.Correct(ctx, uid, mid, in, body)
+		if code(err) != apperr.InvalidContent || details(err)["path"] != c.path || details(err)["reason"] != c.why {
+			t.Errorf("%s: %v %v", name, err, details(err))
+		}
+	}
 }

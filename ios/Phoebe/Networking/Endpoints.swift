@@ -44,6 +44,10 @@ enum Endpoints {
         Endpoint(method: .post, path: "/v1/auth/dev", body: json(DevAuthRequest(subject: subject)), requiresAuth: false)
     }
 
+    static func refresh(refreshToken: String) -> Endpoint<TokenPairDTO> {
+        Endpoint(method: .post, path: "/v1/auth/refresh", body: json(RefreshRequest(refreshToken: refreshToken)), requiresAuth: false)
+    }
+
     static func logout() -> Endpoint<EmptyResponse> {
         Endpoint(method: .post, path: "/v1/auth/logout")
     }

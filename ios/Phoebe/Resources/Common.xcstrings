@@ -545,6 +545,23 @@
         }
       }
     },
+    "session.ended": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Your session ended. Please sign in again."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sesi berakhir. Silakan masuk lagi."
+          }
+        }
+      }
+    },
     "status.failed.mom": {
       "extractionState": "manual",
       "localizations": {
@@ -966,6 +983,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Menunggu ruang penyimpanan"
+          }
+        }
+      }
+    },
+    "time.approximate.a11y": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "about %@"
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "sekitar %@"
           }
         }
       }

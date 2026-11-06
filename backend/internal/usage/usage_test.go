@@ -18,6 +18,7 @@ import (
 	"phoebe/internal/httpapi"
 	"phoebe/internal/ids"
 	"phoebe/internal/jobs"
+	"phoebe/internal/jsonx"
 	"phoebe/internal/testutil"
 	"phoebe/internal/usage"
 )
@@ -128,6 +129,9 @@ func TestTrialGrantConfigurableAndOncePerSubject(t *testing.T) {
 	}
 	if d := got.Entitlement.PeriodEnd.Sub(got.Entitlement.PeriodStart.Time); d != 72*time.Hour {
 		t.Fatalf("period length %v", d)
+	}
+	if d := time.Since(got.Entitlement.PeriodStart.Time); d < -time.Minute || d > time.Minute {
+		t.Fatalf("trial period must start at activation (entitlement creation), started %v ago", d)
 	}
 	checkLedger(t, got, 0, 0, 7*60)
 
@@ -317,65 +321,87 @@ func TestPeriodChangeInFlight(t *testing.T) {
 	}
 }
 
-func insertGenerateJob(t *testing.T, q db.Querier, userID, trigger, jobType string, age time.Duration) {
+func insertSlot(t *testing.T, q db.Querier, userID, status string, age time.Duration) {
 	t.Helper()
-	m := testutil.CreateMeeting(t, q, userID)
-	fp := testutil.SHA256Hex([]byte("g"))
 	if _, err := q.Exec(ctx, `
-		INSERT INTO jobs (type, user_id, meeting_id, trigger, idempotency_key, request_fingerprint, max_attempts, correlation_id, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, 3, $7, now() - $8::interval)`,
-		jobType, userID, m, trigger, ids.New(), fp, ids.New(), age.String()); err != nil {
+		INSERT INTO ai_generation_slots (user_id, status, reserved_at, consumed_at, released_at)
+		VALUES ($1, $2, now() - $3 * interval '1 millisecond',
+		        CASE WHEN $2 = 'consumed' THEN now() END, CASE WHEN $2 = 'released' THEN now() END)`,
+		userID, status, age.Milliseconds()); err != nil {
 		t.Fatal(err)
 	}
 }
 
-func TestAIRateLimitWindow(t *testing.T) {
+func TestGenerationSlotWindow(t *testing.T) {
 	pool := testutil.DB(t)
 	cfg := testutil.Config(t)
-	cfg.AIUserJobsPerDay = 3
+	cfg.AIGenerationLimit = 3
 	s := usage.New(pool, cfg, testutil.DiscardLogger())
 	u := testutil.CreateUser(t, pool, 0)
 
-	insertGenerateJob(t, pool, u.ID, jobs.TriggerUser, jobs.TypeGenerateNotes, 25*time.Hour) // outside window
-	insertGenerateJob(t, pool, u.ID, jobs.TriggerSystem, jobs.TypeGenerateNotes, time.Hour)  // system: not counted
-	insertGenerateJob(t, pool, u.ID, jobs.TriggerUser, jobs.TypeGenerateNotes, 3*time.Hour)
-	insertGenerateJob(t, pool, u.ID, jobs.TriggerUser, jobs.TypeGenerateMoM, 2*time.Hour)
+	insertSlot(t, pool, u.ID, "consumed", 25*time.Hour) // outside the window
+	insertSlot(t, pool, u.ID, "released", time.Hour)    // released: not counted
+	insertSlot(t, pool, u.ID, "consumed", 3*time.Hour)
+	insertSlot(t, pool, u.ID, "reserved", 2*time.Hour)
 
 	got := mustGet(t, s, u.ID).AIGenerations
-	if got.LimitPerDay != 3 || got.UsedLast24h != 2 || got.NextAvailableAt != nil {
+	if got.Limit != 3 || got.WindowHours != 24 || got.Used != 1 || got.Reserved != 1 || got.Remaining != 1 || got.NextSlotAt != nil {
 		t.Fatalf("ai_generations %+v", got)
 	}
-	if err := s.CheckAIRate(ctx, pool, u.ID); err != nil {
+	if err := s.CheckSlot(ctx, pool, u.ID); err != nil {
 		t.Fatalf("under limit: %v", err)
 	}
 
-	insertGenerateJob(t, pool, u.ID, jobs.TriggerUser, jobs.TypeGenerateMoM, time.Hour)
+	insertSlot(t, pool, u.ID, "consumed", time.Hour)
 	got = mustGet(t, s, u.ID).AIGenerations
-	if got.UsedLast24h != 3 || got.NextAvailableAt == nil {
+	if got.Used != 2 || got.Reserved != 1 || got.Remaining != 0 || got.NextSlotAt == nil {
 		t.Fatalf("ai_generations at limit %+v", got)
 	}
 	// Oldest counted (3 h ago) leaves the window in 21 h.
-	if d := time.Until(got.NextAvailableAt.Time); d < 21*time.Hour-time.Minute || d > 21*time.Hour+time.Minute {
-		t.Fatalf("next_available_at in %v, want ~21h", d)
+	if d := time.Until(got.NextSlotAt.Time); d < 21*time.Hour-time.Minute || d > 21*time.Hour+time.Minute {
+		t.Fatalf("next_slot_at in %v, want ~21h", d)
 	}
-	err := s.CheckAIRate(ctx, pool, u.ID)
+	err := s.CheckSlot(ctx, pool, u.ID)
 	var ae *apperr.Error
-	if !errors.As(err, &ae) || ae.Code != apperr.RateLimited {
-		t.Fatalf("want rate_limited, got %v", err)
+	if !errors.As(err, &ae) || ae.Code != apperr.AIGenerationLimit || ae.Details["limit"] != 3 || ae.Details["remaining"] != 0 {
+		t.Fatalf("want ai_generation_limit, got %v", err)
 	}
-	if secs := ae.Details["retry_after_seconds"].(int64); secs < 21*3600-60 || secs > 21*3600+60 {
-		t.Fatalf("retry_after_seconds %d", secs)
+	if at, ok := ae.Details["next_slot_at"].(*jsonx.Time); !ok || !at.Equal(got.NextSlotAt.Time) {
+		t.Fatalf("next_slot_at %v", ae.Details)
+	}
+
+	// Window rollover: shift the oldest counted slot out of the window.
+	if _, err := pool.Exec(ctx, `UPDATE ai_generation_slots SET reserved_at = reserved_at - interval '21 hours 1 second'
+		WHERE user_id = $1 AND status = 'consumed' AND reserved_at < now() - interval '150 minutes' AND reserved_at > now() - interval '24 hours'`, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	got = mustGet(t, s, u.ID).AIGenerations
+	if got.Used != 1 || got.Reserved != 1 || got.Remaining != 1 || got.NextSlotAt != nil {
+		t.Fatalf("after rollover %+v", got)
+	}
+	if err := s.CheckSlot(ctx, pool, u.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	// A lowered limit below the counted slots: next_slot_at is when enough slots leave.
+	cfg.AIGenerationLimit = 1
+	got = mustGet(t, s, u.ID).AIGenerations
+	if got.Remaining != 0 || got.NextSlotAt == nil {
+		t.Fatalf("lowered limit %+v", got)
+	}
+	if d := time.Until(got.NextSlotAt.Time); d < 23*time.Hour-time.Minute || d > 23*time.Hour+time.Minute {
+		t.Fatalf("next_slot_at in %v, want ~23h (second oldest)", d)
 	}
 }
 
-func TestAIRateLimitRace(t *testing.T) {
+func TestGenerationSlotRace(t *testing.T) {
 	pool := testutil.DB(t)
 	cfg := testutil.Config(t)
-	cfg.AIUserJobsPerDay = 4
+	cfg.AIGenerationLimit = 4
 	s := usage.New(pool, cfg, testutil.DiscardLogger())
 	u := testutil.CreateUser(t, pool, 0)
-	for range cfg.AIUserJobsPerDay - 1 {
-		insertGenerateJob(t, pool, u.ID, jobs.TriggerUser, jobs.TypeGenerateNotes, time.Hour)
+	for range cfg.AIGenerationLimit - 1 {
+		insertSlot(t, pool, u.ID, "consumed", time.Hour)
 	}
 
 	const n = 12
@@ -387,23 +413,24 @@ func TestAIRateLimitRace(t *testing.T) {
 	start := make(chan struct{})
 	errs := make([]error, n)
 	for i := range n {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			<-start
 			errs[i] = db.InTx(ctx, pool, func(tx pgx.Tx) error {
 				if err := db.LockMeeting(ctx, tx, meetings[i], u.ID); err != nil {
 					return err
 				}
-				if err := s.CheckAIRate(ctx, tx, u.ID); err != nil {
+				if err := s.CheckSlot(ctx, tx, u.ID); err != nil {
 					return err
 				}
-				_, err := jobs.Enqueue(ctx, tx, jobs.NewJob{Type: jobs.TypeGenerateMoM, UserID: u.ID, MeetingID: meetings[i],
+				j, err := jobs.Enqueue(ctx, tx, jobs.NewJob{Type: jobs.TypeGenerateMoM, UserID: u.ID, MeetingID: meetings[i],
 					Trigger: jobs.TriggerUser, IdempotencyKey: ids.New(), RequestFingerprint: testutil.SHA256Hex([]byte("r")),
 					MaxAttempts: 3, CorrelationID: ids.New()})
-				return err
+				if err != nil {
+					return err
+				}
+				return usage.ReserveSlot(ctx, tx, usage.Slot{UserID: u.ID, MeetingID: meetings[i], JobID: j.ID})
 			})
-		}()
+		})
 	}
 	close(start)
 	wg.Wait()
@@ -412,7 +439,7 @@ func TestAIRateLimitRace(t *testing.T) {
 		switch {
 		case err == nil:
 			ok++
-		case apperr.Is(err, apperr.RateLimited):
+		case apperr.Is(err, apperr.AIGenerationLimit):
 			limited++
 		default:
 			t.Fatalf("unexpected error: %v", err)
@@ -421,8 +448,87 @@ func TestAIRateLimitRace(t *testing.T) {
 	if ok != 1 || limited != n-1 {
 		t.Fatalf("ok=%d limited=%d, want exactly one success", ok, limited)
 	}
-	if got := mustGet(t, s, u.ID).AIGenerations.UsedLast24h; got != cfg.AIUserJobsPerDay {
-		t.Fatalf("used_last_24h %d", got)
+	if got := mustGet(t, s, u.ID).AIGenerations; got.Used+got.Reserved != cfg.AIGenerationLimit || got.Remaining != 0 {
+		t.Fatalf("%+v", got)
+	}
+}
+
+func TestSlotTransitions(t *testing.T) {
+	pool := testutil.DB(t)
+	cfg := testutil.Config(t)
+	s := usage.New(pool, cfg, testutil.DiscardLogger())
+	u := testutil.CreateUser(t, pool, 0)
+	m := testutil.CreateMeeting(t, pool, u.ID)
+	job := func(typ string) string {
+		j, err := jobs.Enqueue(ctx, pool, jobs.NewJob{Type: typ, UserID: u.ID, MeetingID: m, Trigger: jobs.TriggerUser,
+			IdempotencyKey: ids.New(), RequestFingerprint: testutil.SHA256Hex([]byte("s")), MaxAttempts: 3, CorrelationID: ids.New()})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return j.ID
+	}
+	status := func(where string, arg string) string {
+		var st string
+		if err := pool.QueryRow(ctx, `SELECT status FROM ai_generation_slots WHERE `+where, arg).Scan(&st); err != nil {
+			t.Fatal(where, err)
+		}
+		return st
+	}
+	tj := job(jobs.TypeTranscribe)
+	if err := usage.ReserveSlot(ctx, pool, usage.Slot{UserID: u.ID, MeetingID: m, TranscribeJobID: tj}); err != nil {
+		t.Fatal(err)
+	}
+	if err := usage.ReserveSlot(ctx, pool, usage.Slot{UserID: u.ID, MeetingID: m, TranscribeJobID: tj}); !db.IsUniqueViolation(err, "") {
+		t.Fatal("second slot for the same job", err)
+	}
+	nj := job(jobs.TypeGenerateNotes)
+	if err := usage.AttachSlot(ctx, pool, tj, nj); err != nil {
+		t.Fatal(err)
+	}
+	for range 2 {
+		if err := usage.ConsumeSlot(ctx, pool, nj); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := usage.ReleaseSlot(ctx, pool, nj); err != nil {
+		t.Fatal(err)
+	}
+	if status(`job_id = $1`, nj) != "consumed" || mustGet(t, s, u.ID).AIGenerations.Used != 1 {
+		t.Fatal("consume once; release after consume is a no-op")
+	}
+
+	mj := job(jobs.TypeGenerateMoM)
+	if err := usage.ReserveSlot(ctx, pool, usage.Slot{UserID: u.ID, MeetingID: m, JobID: mj}); err != nil {
+		t.Fatal(err)
+	}
+	if err := usage.ReleaseSlot(ctx, pool, mj); err != nil {
+		t.Fatal(err)
+	}
+	if status(`job_id = $1`, mj) != "released" {
+		t.Fatal("release")
+	}
+	if got := mustGet(t, s, u.ID).AIGenerations; got.Used != 1 || got.Reserved != 0 || got.Remaining != cfg.AIGenerationLimit-1 {
+		t.Fatalf("%+v", got)
+	}
+
+	m2 := testutil.CreateMeeting(t, pool, u.ID)
+	if err := usage.ReserveSlot(ctx, pool, usage.Slot{UserID: u.ID, MeetingID: m2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := usage.ReleaseMeeting(ctx, pool, m2); err != nil {
+		t.Fatal(err)
+	}
+	if status(`meeting_id = $1`, m2) != "released" {
+		t.Fatal("release meeting")
+	}
+	if err := usage.ReserveSlot(ctx, pool, usage.Slot{UserID: u.ID, MeetingID: m2}); err != nil {
+		t.Fatal(err)
+	}
+	if err := usage.ReleaseUser(ctx, pool, u.ID); err != nil {
+		t.Fatal(err)
+	}
+	if got := mustGet(t, s, u.ID).AIGenerations; got.Reserved != 0 || got.Used != 1 {
+		t.Fatalf("release user %+v", got)
 	}
 }
 
@@ -529,11 +635,11 @@ func TestGetUsageHTTP(t *testing.T) {
 	ai := body["ai_generations"].(map[string]any)
 	if ent["plan"] != "trial" || ent["status"] != "active" || ent["quota_seconds"] != 7200.0 ||
 		body["consumed_seconds"] != 3601.0 || body["reserved_seconds"] != 0.0 || body["remaining_seconds"] != 3599.0 ||
-		ai["limit_per_day"] != float64(cfg.AIUserJobsPerDay) || ai["used_last_24h"] != 0.0 {
+		ai["limit"] != 30.0 || ai["window_hours"] != 24.0 || ai["used"] != 0.0 || ai["reserved"] != 0.0 || ai["remaining"] != 30.0 {
 		t.Fatalf("body %v", body)
 	}
-	if v, ok := ai["next_available_at"]; !ok || v != nil {
-		t.Fatalf("next_available_at must be present and null: %v", ai)
+	if v, ok := ai["next_slot_at"]; !ok || v != nil {
+		t.Fatalf("next_slot_at must be present and null: %v", ai)
 	}
 	if ps, _ := ent["period_start"].(string); len(ps) != len("2026-11-06T02:00:00.000Z") {
 		t.Fatalf("period_start format %q", ps)

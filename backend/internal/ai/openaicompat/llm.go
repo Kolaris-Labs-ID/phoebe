@@ -15,12 +15,17 @@ import (
 const maxResponseBytes = 16 << 20
 
 type Config struct {
+	Provider    string
 	BaseURL     string
 	APIKey      string
 	Model       string
 	Temperature float64
 	Timeout     time.Duration
 	Client      *http.Client
+
+	// Sent on every call because DeepSeek's own default is thinking enabled; on only for tasks true in Thinking.
+	ThinkingParam bool
+	Thinking      map[ai.Task]bool
 }
 
 type LLM struct {
@@ -29,13 +34,16 @@ type LLM struct {
 
 func New(cfg Config) *LLM {
 	cfg.BaseURL = strings.TrimRight(cfg.BaseURL, "/")
+	if cfg.Provider == "" {
+		cfg.Provider = "openaicompat"
+	}
 	if cfg.Client == nil {
 		cfg.Client = &http.Client{}
 	}
 	return &LLM{cfg: cfg}
 }
 
-func (l *LLM) Name() (string, string) { return "openaicompat", l.cfg.Model }
+func (l *LLM) Name() (string, string) { return l.cfg.Provider, l.cfg.Model }
 
 type message struct {
 	Role    string `json:"role"`
@@ -47,6 +55,7 @@ type request struct {
 	Messages       []message         `json:"messages"`
 	Temperature    float64           `json:"temperature"`
 	ResponseFormat map[string]string `json:"response_format"`
+	Thinking       map[string]string `json:"thinking,omitempty"`
 }
 
 type response struct {
@@ -70,12 +79,19 @@ func (l *LLM) Complete(ctx context.Context, system, user string) (ai.LLMResult, 
 		ctx, cancel = context.WithTimeout(ctx, l.cfg.Timeout)
 		defer cancel()
 	}
-	payload, err := json.Marshal(request{
+	r := request{
 		Model:          l.cfg.Model,
 		Messages:       []message{{Role: "system", Content: system}, {Role: "user", Content: user}},
 		Temperature:    l.cfg.Temperature,
 		ResponseFormat: map[string]string{"type": "json_object"},
-	})
+	}
+	if l.cfg.ThinkingParam {
+		r.Thinking = map[string]string{"type": "disabled"}
+		if l.cfg.Thinking[ai.TaskOf(ctx)] {
+			r.Thinking["type"] = "enabled"
+		}
+	}
+	payload, err := json.Marshal(r)
 	if err != nil {
 		return ai.LLMResult{}, err
 	}
@@ -115,6 +131,10 @@ func (l *LLM) Complete(ctx context.Context, system, user string) (ai.LLMResult, 
 	res.FinishReason = c.FinishReason
 	if c.FinishReason == "length" {
 		return res, ai.InvalidOutput(resp.StatusCode, "finish_reason length")
+	}
+	// DeepSeek JSON mode may return blank content (spaces) with finish_reason "stop".
+	if strings.TrimSpace(res.Content) == "" {
+		return res, ai.InvalidOutput(resp.StatusCode, "blank content")
 	}
 	return res, nil
 }

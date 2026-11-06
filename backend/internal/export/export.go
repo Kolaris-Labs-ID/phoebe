@@ -161,13 +161,14 @@ func header(in Input) Header {
 type labels struct {
 	untitled, noDate, draft, participants, none, undetermined, fromNotes string
 	no, task, pic, deadline, source                                      string
+	approxLegend                                                         string
 }
 
 var labelSets = map[string]labels{
 	"id": {"Rapat tanpa judul", "Tanggal belum ditentukan", "DRAFT — belum ditinjau", "Peserta", "Tidak ada.", "Belum ditentukan", "(dari catatan pengguna)",
-		"No", "Tugas", "PIC", "Deadline", "Sumber"},
+		"No", "Tugas", "PIC", "Deadline", "Sumber", "~ = perkiraan waktu"},
 	"en": {"Untitled meeting", "Date not set", "DRAFT — not reviewed", "Participants", "None.", "Not determined", "(from user notes)",
-		"No", "Task", "PIC", "Deadline", "Source"},
+		"No", "Task", "PIC", "Deadline", "Source", "~ = approximate time"},
 }
 
 // doc is the format-independent view every renderer walks, so all formats carry
@@ -181,6 +182,7 @@ type doc struct {
 	draft        bool
 	createdAt    time.Time
 	sections     []section
+	approximate  bool
 }
 
 type section struct {
@@ -317,8 +319,8 @@ func (d *doc) deadline(a documents.ActionItem) string {
 	return d.l.undetermined
 }
 
-// refs renders transcript refs as "[01:02, 05:40]" and user-notes refs as one label;
-// ids are never printed.
+// refs renders transcript refs as "[01:02, 05:40]" ("~01:02" when approximate) and
+// user-notes refs as one label; ids are never printed.
 func (d *doc) refs(rs []documents.SourceRef) string {
 	var times []string
 	seen := map[string]bool{}
@@ -327,6 +329,10 @@ func (d *doc) refs(rs []documents.SourceRef) string {
 		switch r.Type {
 		case documents.RefTranscript:
 			ts := timestamp(r.StartMS)
+			if r.Approximate {
+				ts = "~" + ts
+				d.approximate = true
+			}
 			if !seen[ts] {
 				seen[ts] = true
 				times = append(times, ts)

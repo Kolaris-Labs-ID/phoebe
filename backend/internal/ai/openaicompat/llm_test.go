@@ -71,6 +71,9 @@ func TestCompleteJSONMode(t *testing.T) {
 	if rf, _ := req["response_format"].(map[string]any); rf["type"] != "json_object" {
 		t.Errorf("response_format %v", req["response_format"])
 	}
+	if _, ok := req["thinking"]; ok {
+		t.Errorf("openaicompat must not send the DeepSeek thinking param: %v", req["thinking"])
+	}
 	msgs, _ := req["messages"].([]any)
 	if len(msgs) != 2 {
 		t.Fatalf("messages %v", msgs)
@@ -193,4 +196,48 @@ func TestCompleteNetworkError(t *testing.T) {
 	srv.Close()
 	_, err := newLLM(url).Complete(context.Background(), "s", "u")
 	wantErr(t, err, jobs.CatProviderUnavailable, true, 0)
+}
+
+func TestDeepSeekThinkingParam(t *testing.T) {
+	cases := []struct {
+		name string
+		ctx  context.Context
+		want string
+	}{
+		{"untagged off", context.Background(), "disabled"},
+		{"notes off by default", ai.WithTask(context.Background(), ai.TaskNotes), "disabled"},
+		{"mom on", ai.WithTask(context.Background(), ai.TaskMoM), "enabled"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var req map[string]any
+			srv := server(t, 200, nil, completion(`{"sections":[]}`, "stop"), &req)
+			l := New(Config{Provider: "deepseek", BaseURL: srv.URL + "/v1", APIKey: "key-1", Model: "deepseek-flash",
+				ThinkingParam: true, Thinking: map[ai.Task]bool{ai.TaskNotes: false, ai.TaskMoM: true}})
+			if p, m := l.Name(); p != "deepseek" || m != "deepseek-flash" {
+				t.Fatalf("name %s %s", p, m)
+			}
+			if _, err := l.Complete(c.ctx, "json", "u"); err != nil {
+				t.Fatal(err)
+			}
+			th, _ := req["thinking"].(map[string]any)
+			if th["type"] != c.want || len(th) != 1 {
+				t.Errorf("thinking %v, want type %s", req["thinking"], c.want)
+			}
+			if rf, _ := req["response_format"].(map[string]any); rf["type"] != "json_object" {
+				t.Errorf("response_format %v", req["response_format"])
+			}
+		})
+	}
+}
+
+func TestCompleteBlankContent(t *testing.T) {
+	for _, content := range []string{"", "   \n  "} {
+		srv := server(t, 200, nil, completion(content, "stop"), nil)
+		res, err := newLLM(srv.URL).Complete(context.Background(), "s", "u")
+		e := wantErr(t, err, jobs.CatInvalidOutput, true, 200)
+		if e.Detail() != "http 200 blank content" || res.InputTokens != 1200 {
+			t.Errorf("detail %q tokens %d", e.Detail(), res.InputTokens)
+		}
+	}
 }

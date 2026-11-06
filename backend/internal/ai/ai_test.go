@@ -120,3 +120,12 @@ func TestCost(t *testing.T) {
 		t.Errorf("stt tiny = %d", got)
 	}
 }
+
+func TestTaskContext(t *testing.T) {
+	if TaskOf(context.Background()) != "" {
+		t.Fatal("untagged context has a task")
+	}
+	if got := TaskOf(WithTask(context.Background(), TaskMoM)); got != TaskMoM {
+		t.Fatalf("task %q", got)
+	}
+}

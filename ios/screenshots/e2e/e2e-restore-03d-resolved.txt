@@ -1,0 +1,93 @@
+Optional(Attributes: Application, 0x10742fe30, pid: 38768, label: 'Phoebe'
+Element subtree:
+ →Application, 0x10742fe30, pid: 38768, label: 'Phoebe'
+    Window (Main), 0x10743d260, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10743dbc0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10743dce0, {{0.0, 0.0}, {440.0, 956.0}}
+          Other, 0x10743d920, {{0.0, 0.0}, {440.0, 956.0}}
+            Other, 0x10743da40, {{0.0, 0.0}, {440.0, 956.0}}
+              Other, 0x10743de00, {{0.0, 0.0}, {440.0, 956.0}}
+                NavigationBar, 0x10743df20, {{0.0, 56.3}, {440.0, 44.0}}, identifier: 'Meeting'
+                  Button, 0x10743e040, {{0.0, 56.3}, {96.3, 44.0}}, label: 'Meeting'
+                  Other, 0x10743e160, {{368.0, 56.3}, {52.0, 44.0}}, label: 'Tindakan lain'
+                    Other, 0x10743e280, {{368.0, 56.3}, {52.0, 44.0}}
+                      Button, 0x10743e3a0, {{368.0, 52.3}, {52.0, 52.0}}, label: 'Tindakan lain'
+                        Button, 0x10743e4c0, {{368.0, 52.3}, {52.0, 52.0}}
+                          Other, 0x10743e5e0, {{368.0, 52.3}, {52.0, 52.0}}
+                            Image, 0x10743e700, {{368.0, 52.3}, {52.0, 52.0}}, identifier: 'ellipsis.circle', label: 'Lainnya'
+                  StaticText, 0x10743e820, {{219.7, 78.0}, {1.0, 1.0}}, label: 'Meeting'
+                    Other, 0x10743e940, {{219.7, 78.0}, {1.0, 1.0}}
+                      Other, 0x10743ea60, {{219.7, 78.0}, {1.0, 1.0}}
+                Other, 0x10743eb80, {{0.0, 0.0}, {440.0, 956.0}}
+                  Other, 0x10743eca0, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x10743edc0, {{0.0, 0.0}, {440.0, 956.0}}
+                      Other, 0x10743eee0, {{0.0, 0.0}, {440.0, 956.0}}
+                        ScrollView, 0x10743f000, {{0.0, 0.0}, {440.0, 956.0}}
+                          Other, 0x10743f120, {{0.0, 100.3}, {440.0, 763.0}}
+                            Other, 0x10743f240, {{16.0, 108.3}, {408.0, 718.7}}
+                              Button, 0x10743f360, {{16.0, 108.3}, {169.7, 26.3}}, label: 'Rapat dari server'
+                              StaticText, 0x10743f480, {{16.0, 142.7}, {245.0, 18.0}}, label: 'Kam, 5 Nov 2026, 9.00 WIB · 00:30'
+                              Other, 0x10743f5a0, {{18.0, 168.7}, {214.3, 44.0}}
+                                Image, 0x10743f6c0, {{18.0, 183.7}, {21.7, 14.7}}, identifier: 'person.2', label: 'person.2'
+                                StaticText, 0x10743f7e0, {{48.7, 181.7}, {65.3, 18.0}}, label: 'Budi, Sari'
+                                Button, 0x10743f900, {{122.0, 168.7}, {110.3, 44.0}}, label: 'Tambah peserta'
+                              ScrollView, 0x10743fa20, {{16.0, 220.7}, {408.0, 44.0}}
+                                Other, 0x10743fb40, {{16.0, 220.7}, {208.0, 44.0}}
+                                  Button, 0x10743fc60, {{16.0, 220.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                    Image, 0x10743fd80, {{25.3, 237.0}, {13.7, 11.0}}, identifier: 'folder', label: 'Pindahkan'
+                                    StaticText, 0x10743fea0, {{16.0, 220.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                  Button, 0x10743ffc0, {{136.7, 220.7}, {87.3, 44.0}}, label: 'Tag baru'
+                                    Image, 0x1074400e0, {{146.0, 237.3}, {10.0, 10.0}}, identifier: 'plus', label: 'Tambah'
+                                    StaticText, 0x107440200, {{136.7, 220.7}, {87.3, 44.0}}, label: 'Tag baru'
+                              Other, 0x107440320, {{51.3, 292.7}, {77.3, 36.3}}, label: 'Upload: Selesai'
+                                Image, 0x107440440, {{51.3, 294.3}, {21.0, 14.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
+                                StaticText, 0x107440560, {{77.7, 292.7}, {51.0, 18.0}}, label: 'Upload'
+                                StaticText, 0x107440680, {{68.5, 314.7}, {41.7, 14.3}}, label: 'Selesai'
+                              Other, 0x1074407a0, {{178.3, 293.7}, {84.8, 36.3}}, label: 'Transkrip: Siap'
+                                Image, 0x1074408c0, {{178.3, 293.7}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
+                                StaticText, 0x1074409e0, {{200.5, 293.8}, {62.7, 16.7}}, label: 'Transkrip'
+                                StaticText, 0x107440b00, {{207.3, 315.7}, {25.3, 14.3}}, label: 'Siap'
+                              Other, 0x107440c20, {{320.7, 293.7}, {61.5, 36.3}}, label: 'Notes: Siap'
+                                Image, 0x107440d40, {{320.7, 293.7}, {17.0, 17.0}}, identifier: 'checkmark.circle', label: 'Dipilih', Selected
+                                StaticText, 0x107440e60, {{342.8, 293.8}, {39.3, 16.7}}, label: 'Notes'
+                                StaticText, 0x107440f80, {{338.0, 315.7}, {25.3, 14.3}}, label: 'Siap'
+                              Button, 0x1074410a0, {{28.0, 370.0}, {44.0, 44.0}}, identifier: 'gobackward.15', label: 'Mundur 15 detik'
+                              Button, 0x1074411c0, {{88.0, 370.0}, {44.0, 44.0}}, identifier: 'play.fill', label: 'Putar'
+                              Button, 0x1074412e0, {{148.0, 370.0}, {44.0, 44.0}}, identifier: 'goforward.15', label: 'Maju 15 detik'
+                              StaticText, 0x107441400, {{317.3, 383.0}, {94.7, 18.0}}, label: '00:00 / 00:30'
+                              Slider, 0x107441520, {{28.0, 422.0}, {384.0, 31.0}}, label: 'Posisi', value: 0 detik dari 30 de...
+                              Button, 0x107441640, {{301.7, 544.0}, {122.3, 44.0}}, label: 'Lihat versi asli'
+                                Image, 0x107441760, {{301.3, 558.7}, {16.7, 15.0}}, identifier: 'clock.arrow.circlepath', label: 'clock.arrow.circlepath'
+                                StaticText, 0x107441880, {{301.7, 544.0}, {122.3, 44.0}}, label: 'Lihat versi asli'
+                              StaticText, 0x1074419a0, {{17.0, 600.0}, {404.7, 15.7}}, label: 'Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik).'
+                                Image, 0x107441ac0, {{17.0, 601.3}, {13.0, 13.0}}, identifier: 'info.circle', label: 'Info'
+                                StaticText, 0x107441be0, {{17.0, 600.0}, {404.7, 15.7}}, label: 'Waktu bersifat perkiraan per bagian rekaman (sekitar 30 detik).'
+                              Button, 0x107441d00, {{24.0, 631.7}, {294.0, 55.7}}, label: 'sekitar 0 detik, Selamat pagi semua, mari kita mulai rapatnya.'
+                                Button, 0x107441e20, {{24.0, 631.7}, {50.3, 44.0}}, label: '~00:00'
+                                StaticText, 0x107441f40, {{86.3, 642.7}, {231.7, 44.7}}, label: 'Selamat pagi semua, mari kita mulai rapatnya.'
+                              Button, 0x107442060, {{24.0, 707.3}, {322.0, 55.7}}, label: 'sekitar 15 detik, Agenda hari ini adalah membahas progres proyek.'
+                                Button, 0x107442180, {{24.0, 707.3}, {50.3, 44.0}}, label: '~00:15'
+                                StaticText, 0x1074422a0, {{86.3, 718.3}, {259.7, 44.7}}, label: 'Agenda hari ini adalah membahas progres proyek.'
+                              Button, 0x1074423c0, {{24.0, 783.0}, {275.0, 44.0}}, label: 'sekitar 30 detik, Kita sepakat rilis hari Jumat.'
+                                Button, 0x1074424e0, {{24.0, 783.0}, {50.3, 44.0}}, label: '~00:30'
+                                StaticText, 0x107442600, {{86.3, 794.0}, {212.7, 20.3}}, label: 'Kita sepakat rilis hari Jumat.'
+                              SegmentedControl, 0x107442720, {{16.0, 489.0}, {408.0, 31.0}}
+                                Button, 0x107442840, {{16.0, 489.0}, {135.0, 32.0}}, label: 'Transkrip', Selected
+                                Button, 0x107442960, {{152.0, 489.0}, {135.0, 32.0}}, label: 'Catatan'
+                                Button, 0x107442a80, {{288.0, 489.0}, {136.0, 32.0}}, label: 'MoM'
+                          Other, 0x107442ba0, {{407.0, 100.3}, {30.0, 799.7}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x107442cc0, {{434.0, 103.3}, {3.0, 764.7}}
+                          Other, 0x107442de0, {{407.0, 100.3}, {30.0, 799.7}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x107442f00, {{434.0, 103.3}, {3.0, 764.7}}
+    Window, 0x107443020, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x107443140, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107443260, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107443380, {{0.0, 956.0}, {440.0, 243.0}}
+Path to element:
+ →Application, 0x10742fe30, pid: 38768, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x10a734900, pid: 38768, label: 'Phoebe'
+  }
+)

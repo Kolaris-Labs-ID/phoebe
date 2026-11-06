@@ -777,7 +777,99 @@ enum Fx {
         UsageDTO(
             entitlement: EntitlementDTO(plan: "trial", status: status, periodStart: nil, periodEnd: nil, quotaSeconds: 7200),
             consumedSeconds: 0, reservedSeconds: 0, remainingSeconds: remaining,
-            aiGenerations: AIGenerationsDTO(limitPerDay: 30, usedLast24h: 0, nextAvailableAt: nil)
+            aiGenerations: AIGenerationsDTO(limit: 30, windowHours: 24, used: 0, reserved: 0, remaining: 30, nextSlotAt: nil)
         )
+    }
+}
+
+extension SyncEngineTests {
+    static let aiLimitDetails = #"{"limit":30,"remaining":0,"next_slot_at":"2026-11-06T05:00:00.000Z"}"#
+
+    @Test func transcriptionWithoutAISlotKeepsIntentBlockedAndStopsResending() async throws {
+        let h = try SyncHarness()
+        let meeting = h.seedMeeting()
+        let engine = h.engine()
+        let path = "/v1/meetings/\(meeting.id.lower)/transcription"
+        h.server.always("POST", path, .error(429, "ai_generation_limit", Self.aiLimitDetails))
+
+        await #expect(throws: APIError.self) {
+            try await engine.requestGeneration(meetingID: meeting.id, type: .transcribe, body: APICoding.encode(TranscriptionRequest(language: .id)))
+        }
+        let intent = try #require(h.store.intents(meeting.id).first)
+        #expect(IntentSender.isBlockedByAILimit(intent))
+        #expect(h.store.meeting(meeting.id)?.localPhase == LocalPhase.none)
+
+        await engine.pushAll()
+        #expect(h.server.requests(.post, "/transcription").count == 1)
+    }
+
+    @Test func retryingABlockedTranscriptionUsesANewKey() async throws {
+        let h = try SyncHarness()
+        let meeting = h.seedMeeting()
+        let engine = h.engine()
+        let path = "/v1/meetings/\(meeting.id.lower)/transcription"
+        let body = APICoding.encode(TranscriptionRequest(language: .id))
+        h.server.enqueue("POST", path, .error(429, "ai_generation_limit", Self.aiLimitDetails))
+        h.server.enqueue("POST", path, .json(202, Fx.jobEnvelope(meetingID: meeting.id)))
+
+        _ = try? await engine.requestGeneration(meetingID: meeting.id, type: .transcribe, body: body)
+        try await engine.requestGeneration(meetingID: meeting.id, type: .transcribe, body: body)
+
+        let posts = h.server.requests(.post, "/transcription")
+        try #require(posts.count == 2)
+        #expect(posts[0].headers["Idempotency-Key"] != posts[1].headers["Idempotency-Key"])
+        #expect(posts.allSatisfy { $0.body == body })
+        #expect(h.store.intents(meeting.id).isEmpty)
+    }
+
+    @Test func transcribeOnlyReplacesTheBlockedIntentWithSkipAndANewKey() async throws {
+        let h = try SyncHarness()
+        let meeting = h.seedMeeting()
+        let engine = h.engine()
+        let path = "/v1/meetings/\(meeting.id.lower)/transcription"
+        h.server.enqueue("POST", path, .error(429, "ai_generation_limit", Self.aiLimitDetails))
+        h.server.enqueue("POST", path, .json(202, Fx.jobEnvelope(meetingID: meeting.id)))
+
+        _ = try? await engine.requestGeneration(meetingID: meeting.id, type: .transcribe, body: APICoding.encode(TranscriptionRequest(language: .id)))
+        let blockedKey = try #require(h.store.intents(meeting.id).first).idempotencyKey
+        try await engine.requestGeneration(meetingID: meeting.id, type: .transcribe, body: APICoding.encode(TranscriptionRequest(language: .id, notes: .skip)))
+
+        let last = try #require(h.server.requests(.post, "/transcription").last)
+        #expect(last.json["notes"] as? String == "skip")
+        #expect(last.headers["Idempotency-Key"] != blockedKey.lower)
+        #expect(h.store.intents(meeting.id).isEmpty)
+        #expect(h.store.meeting(meeting.id)?.activeJobTypes == ["transcribe"])
+    }
+
+    @Test func notesGenerationWithoutAISlotIsRejectedAndNotQueued() async throws {
+        let h = try SyncHarness()
+        let meeting = h.seedMeeting()
+        let engine = h.engine()
+        h.server.always("POST", "/v1/meetings/\(meeting.id.lower)/documents/ai_notes/generate", .error(429, "ai_generation_limit", Self.aiLimitDetails))
+
+        do {
+            try await engine.requestGeneration(meetingID: meeting.id, type: .generateNotes, body: APICoding.encode(GenerateNotesRequest(language: nil)))
+            Issue.record("expected ai_generation_limit")
+        } catch let error as APIError {
+            #expect(error.isAIGenerationLimit)
+        }
+        #expect(h.store.intents(meeting.id).isEmpty)
+        await engine.pushAll()
+        #expect(h.server.requests(.post, "/ai_notes/generate").count == 1)
+    }
+
+    @Test func languageChangeKeepsTheTranscribeOnlyChoice() async throws {
+        let h = try SyncHarness()
+        let meeting = h.seedMeeting()
+        let intent = PendingIntent(meetingID: meeting.id, type: .transcribe, body: APICoding.encode(TranscriptionRequest(language: .id, notes: .skip)))
+        h.context.insert(intent)
+        h.store.save()
+        let engine = h.engine()
+        h.server.always("PATCH", "/v1/meetings/\(meeting.id.lower)", .json(200, #"{"meeting":\#(Fx.meeting(id: meeting.id))}"#))
+
+        engine.enqueue(.patchMeeting(meeting.id, MeetingPatchRequest(language: .set(.en))))
+
+        #expect(IntentSender.language(of: intent) == .en)
+        #expect(IntentSender.notes(of: intent) == .skip)
     }
 }

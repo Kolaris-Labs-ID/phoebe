@@ -192,6 +192,24 @@ func TestTranscriptsHTTPFlow(t *testing.T) {
 	}
 }
 
+func TestTranscriptionNullBodyHTTP(t *testing.T) {
+	e := newTranscriptsServer(t)
+	u := testutil.CreateUser(t, e.pool, 3600)
+	path := "/v1/meetings/" + e.uploadedMeeting(t, u.ID, 30_000) + "/transcription"
+	key := ids.New()
+	st, body := callKey(t, e.srv, "POST", path, u.Token, key, `null`)
+	job, _ := body["job"].(map[string]any)
+	if st != 202 || job["status"] != "queued" {
+		t.Fatal(st, body)
+	}
+	for _, b := range []string{``, `{}`, ` null `} {
+		st, body := callKey(t, e.srv, "POST", path, u.Token, key, b)
+		if replay, _ := body["job"].(map[string]any); st != 200 || replay["id"] != job["id"] {
+			t.Fatalf("%q must replay the null-body start: %d %v", b, st, body)
+		}
+	}
+}
+
 func TestTranscriptsQuotaHTTP(t *testing.T) {
 	e := newTranscriptsServer(t)
 	u := testutil.CreateUser(t, e.pool, 5)

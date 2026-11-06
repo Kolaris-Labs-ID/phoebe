@@ -1,7 +1,7 @@
 import Foundation
 
 enum StepState: Equatable {
-    case pending, waitingConnection, waitingQuota, planExpired
+    case pending, waitingConnection, waitingQuota, planExpired, waitingAISlot, notGenerated
     case active(percent: Int?)
     case verifying, done, failed
 }
@@ -22,10 +22,11 @@ struct StageInputs: Equatable {
     var hasAINotes = false
     var transcribeJob: JobSnapshot?
     var notesJob: JobSnapshot?
+    var aiSlotBlocked = false
 }
 
 enum DetailStatus {
-    private static let pastUpload: Set<PipelineState> = [.uploaded, .transcribing, .transcriptionFailed, .generatingNotes, .notesFailed, .notesReady]
+    private static let pastUpload: Set<PipelineState> = [.uploaded, .transcribing, .transcriptionFailed, .transcriptReady, .generatingNotes, .notesFailed, .notesReady]
 
     static func upload(_ s: StageInputs) -> StepState {
         if s.uploadState == .failed || s.uploadState == .rejected || s.localPhase == .rejected { return .failed }
@@ -45,6 +46,7 @@ enum DetailStatus {
         if s.hasTranscript { return .done }
         if s.transcribeJob?.status.isActive == true || s.pipeline == .transcribing { return .active(percent: nil) }
         if s.pipeline == .transcriptionFailed || s.transcribeJob?.status == .failed { return .failed }
+        if s.aiSlotBlocked { return .waitingAISlot }
         switch s.localPhase {
         case .waitingQuota: return .waitingQuota
         case .waitingEntitlement: return .planExpired
@@ -55,7 +57,8 @@ enum DetailStatus {
     static func notes(_ s: StageInputs) -> StepState {
         if s.notesJob?.status.isActive == true || s.pipeline == .generatingNotes { return .active(percent: nil) }
         if s.pipeline == .notesFailed || s.notesJob?.status == .failed { return .failed }
-        return s.hasAINotes ? .done : .pending
+        if s.hasAINotes { return .done }
+        return s.pipeline == .transcriptReady ? .notGenerated : .pending
     }
 
     static func isNoSpeech(_ s: StageInputs) -> Bool {
@@ -108,7 +111,7 @@ enum GenerationBlock: Equatable {
         case .needsNotes: "mom.needsNotes"
         case .transcriptNotReady: "detail.notes.needsTranscript"
         case .inProgress: "detail.ai.inProgress"
-        case .rateLimited: "doc.regen.limited"
+        case .rateLimited: AILimitCopy.key
         }
     }
 }
@@ -142,7 +145,8 @@ enum GenerationGate {
     }
 
     static func rateLimitedUntil(usage: UsageDTO?, retryAfter: Date?) -> Date? {
-        [usage?.aiGenerations.nextAvailableAt, retryAfter].compactMap { $0 }.max()
+        let fromUsage = usage.map(\.aiGenerations).flatMap { $0.remaining > 0 ? nil : $0.nextSlotAt }
+        return [fromUsage, retryAfter].compactMap { $0 }.max()
     }
 }
 
@@ -234,5 +238,30 @@ enum TranscriptDiff {
 
     static func playingSegmentID(_ segments: [TranscriptSegment], atMs ms: Int) -> String? {
         segments.last(where: { $0.startMs <= ms && ms < max($0.endMs, $0.startMs + 1) })?.id
+    }
+}
+
+enum AILimitCopy {
+    static let key = "ai.limit.reached"
+}
+
+enum TranscriptReview {
+    static func uncertainIDs(_ segments: [TranscriptSegment]) -> [String] {
+        segments.filter(\.uncertain).map(\.id)
+    }
+
+    static func step(_ ids: [String], from current: String?, forward: Bool) -> String? {
+        guard !ids.isEmpty else { return nil }
+        guard let current, let index = ids.firstIndex(of: current) else { return forward ? ids.first : ids.last }
+        return ids[(index + (forward ? 1 : ids.count - 1)) % ids.count]
+    }
+
+    // Saving an uncertain segment (changed or confirmed as is) resolves it; a changed text would also resolve it server-side.
+    static func resolvedIDs(segment: TranscriptSegment) -> [String] {
+        segment.uncertain ? [segment.id] : []
+    }
+
+    static func canSave(segment: TranscriptSegment, text: String) -> Bool {
+        text.count <= 2000 && (text != segment.text || segment.uncertain)
     }
 }

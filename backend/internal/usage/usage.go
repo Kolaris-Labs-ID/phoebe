@@ -171,52 +171,108 @@ func Release(ctx context.Context, q db.Querier, reservationID string) error {
 	return nil
 }
 
-// ReleaseMeeting frees every in-flight reservation of a meeting (meeting delete tx).
+// ReleaseMeeting frees every in-flight quota reservation and generation slot of a meeting
+// (meeting delete tx).
 func ReleaseMeeting(ctx context.Context, q db.Querier, meetingID string) error {
-	_, err := q.Exec(ctx, `
+	if _, err := q.Exec(ctx, `
 		UPDATE quota_reservations SET status = 'released', released_at = now()
+		WHERE meeting_id = $1 AND status = 'reserved'`, meetingID); err != nil {
+		return err
+	}
+	_, err := q.Exec(ctx, `UPDATE ai_generation_slots SET status = 'released', released_at = now()
 		WHERE meeting_id = $1 AND status = 'reserved'`, meetingID)
 	return err
 }
 
-// ReleaseUser frees every in-flight reservation of a user (account delete tx).
+// ReleaseUser frees every in-flight quota reservation and generation slot of a user (account
+// delete tx).
 func ReleaseUser(ctx context.Context, q db.Querier, userID string) error {
-	_, err := q.Exec(ctx, `
+	if _, err := q.Exec(ctx, `
 		UPDATE quota_reservations SET status = 'released', released_at = now()
+		WHERE user_id = $1 AND status = 'reserved'`, userID); err != nil {
+		return err
+	}
+	_, err := q.Exec(ctx, `UPDATE ai_generation_slots SET status = 'released', released_at = now()
 		WHERE user_id = $1 AND status = 'reserved'`, userID)
 	return err
 }
 
-// aiWindowSQL: user-triggered generations in the last 24 h and the instant one slot frees
-// ($2 = limit; the (used-limit+1)-th oldest leaves the window — the oldest when used = limit).
-const aiWindowSQL = `
-	SELECT count(*)::int,
-	       (array_agg(created_at ORDER BY created_at))[GREATEST(count(*)::int - $2 + 1, 1)] + interval '24 hours',
-	       now()
-	FROM jobs
-	WHERE user_id = $1 AND trigger = 'user' AND type IN ('generate_notes', 'generate_mom')
-	  AND created_at > now() - interval '24 hours'`
+// slotWindowSQL: the user's counted generation slots (reserved or consumed, reserved_at
+// inside the window; $2 = limit, $3 = window in ms). next = when one more slot frees: the
+// (counted-limit+1)-th oldest leaves the window (the oldest when counted = limit).
+const slotWindowSQL = `
+	SELECT count(*) FILTER (WHERE status = 'consumed')::int,
+	       count(*) FILTER (WHERE status = 'reserved')::int,
+	       (array_agg(reserved_at ORDER BY reserved_at))[GREATEST(count(*)::int - $2 + 1, 1)] + $3 * interval '1 millisecond'
+	FROM ai_generation_slots
+	WHERE user_id = $1 AND status IN ('reserved', 'consumed') AND reserved_at > now() - $3 * interval '1 millisecond'`
 
-// CheckAIRate is §8.1 step 4 for user-triggered generate: the entitlement lock serializes a
-// user's concurrent generates, so the count includes every committed competitor.
-func (s *Service) CheckAIRate(ctx context.Context, q db.Querier, userID string) error {
+type SlotStatus struct {
+	Limit, Used, Reserved, Remaining int
+	NextSlotAt                       *time.Time
+}
+
+func (s *Service) slotStatus(ctx context.Context, q db.Querier, userID string) (SlotStatus, error) {
+	st := SlotStatus{Limit: s.cfg.AIGenerationLimit}
+	var next *time.Time
+	if err := q.QueryRow(ctx, slotWindowSQL, userID, st.Limit, s.cfg.AIGenerationWindow.Milliseconds()).
+		Scan(&st.Used, &st.Reserved, &next); err != nil {
+		return SlotStatus{}, err
+	}
+	st.Remaining = max(0, st.Limit-st.Used-st.Reserved)
+	if st.Remaining == 0 {
+		st.NextSlotAt = next
+	}
+	return st, nil
+}
+
+func LimitError(st SlotStatus) error {
+	return apperr.WithDetails(apperr.AIGenerationLimit, map[string]any{
+		"limit": st.Limit, "remaining": 0, "next_slot_at": jsonx.TimePtr(st.NextSlotAt)})
+}
+
+// The entitlement row lock serializes a user's concurrent reservations; insert with ReserveSlot in the same tx.
+func (s *Service) CheckSlot(ctx context.Context, q db.Querier, userID string) error {
 	if _, err := q.Exec(ctx, `SELECT 1 FROM entitlements WHERE user_id = $1 FOR UPDATE`, userID); err != nil {
 		return err
 	}
-	var used int
-	var next *time.Time
-	var now time.Time
-	if err := q.QueryRow(ctx, aiWindowSQL, userID, s.cfg.AIUserJobsPerDay).Scan(&used, &next, &now); err != nil {
+	st, err := s.slotStatus(ctx, q, userID)
+	if err != nil {
 		return err
 	}
-	if used < s.cfg.AIUserJobsPerDay {
-		return nil
+	if st.Remaining == 0 {
+		return LimitError(st)
 	}
-	var wait time.Duration
-	if next != nil {
-		wait = next.Sub(now)
-	}
-	return apperr.RateLimit(wait)
+	return nil
+}
+
+type Slot struct {
+	UserID, MeetingID, JobID, TranscribeJobID string
+}
+
+func ReserveSlot(ctx context.Context, q db.Querier, sl Slot) error {
+	_, err := q.Exec(ctx, `INSERT INTO ai_generation_slots (user_id, meeting_id, job_id, transcribe_job_id)
+		VALUES ($1, $2, $3, $4)`, sl.UserID, sl.MeetingID, nullable(sl.JobID), nullable(sl.TranscribeJobID))
+	return err
+}
+
+func AttachSlot(ctx context.Context, q db.Querier, transcribeJobID, notesJobID string) error {
+	_, err := q.Exec(ctx, `UPDATE ai_generation_slots SET job_id = $2
+		WHERE transcribe_job_id = $1 AND status = 'reserved'`, transcribeJobID, notesJobID)
+	return err
+}
+
+// The status = 'reserved' guard keeps a rerun from consuming twice.
+func ConsumeSlot(ctx context.Context, q db.Querier, jobID string) error {
+	_, err := q.Exec(ctx, `UPDATE ai_generation_slots SET status = 'consumed', consumed_at = now()
+		WHERE job_id = $1 AND status = 'reserved'`, jobID)
+	return err
+}
+
+func ReleaseSlot(ctx context.Context, q db.Querier, jobID string) error {
+	_, err := q.Exec(ctx, `UPDATE ai_generation_slots SET status = 'released', released_at = now()
+		WHERE (job_id = $1 OR transcribe_job_id = $1) AND status = 'reserved'`, jobID)
+	return err
 }
 
 type Usage struct {
@@ -236,17 +292,20 @@ type EntitlementView struct {
 }
 
 type AIGenerations struct {
-	LimitPerDay     int         `json:"limit_per_day"`
-	UsedLast24h     int         `json:"used_last_24h"`
-	NextAvailableAt *jsonx.Time `json:"next_available_at"`
+	Limit       int         `json:"limit"`
+	WindowHours int         `json:"window_hours"`
+	Used        int         `json:"used"`
+	Reserved    int         `json:"reserved"`
+	Remaining   int         `json:"remaining"`
+	NextSlotAt  *jsonx.Time `json:"next_slot_at"`
 }
 
 // Get is GET /v1/usage, read in one statement (one snapshot).
 func (s *Service) Get(ctx context.Context, userID string) (Usage, error) {
 	var u Usage
 	var e Entitlement
+	st := SlotStatus{Limit: s.cfg.AIGenerationLimit}
 	var next *time.Time
-	limit := s.cfg.AIUserJobsPerDay
 	err := s.db.QueryRow(ctx, `
 		WITH e AS (
 			SELECT plan, `+effectiveStatus+` AS status, period_start, period_end, quota_seconds
@@ -255,26 +314,22 @@ func (s *Service) Get(ctx context.Context, userID string) (Usage, error) {
 			SELECT COALESCE(sum(seconds) FILTER (WHERE status = 'consumed' AND period_start = (SELECT period_start FROM e)), 0)::bigint AS consumed,
 			       COALESCE(sum(seconds) FILTER (WHERE status = 'reserved'), 0)::bigint AS reserved
 			FROM quota_reservations WHERE user_id = $1 AND status IN ('consumed', 'reserved')
-		), a AS (
-			SELECT count(*)::int AS used,
-			       (array_agg(created_at ORDER BY created_at))[GREATEST(count(*)::int - $2 + 1, 1)] + interval '24 hours' AS next
-			FROM jobs
-			WHERE user_id = $1 AND trigger = 'user' AND type IN ('generate_notes', 'generate_mom')
-			  AND created_at > now() - interval '24 hours'
-		)
-		SELECT e.plan, e.status, e.period_start, e.period_end, e.quota_seconds, r.consumed, r.reserved, a.used, a.next
-		FROM e, r, a`, userID, limit).
+		), a AS (`+slotWindowSQL+`)
+		SELECT e.plan, e.status, e.period_start, e.period_end, e.quota_seconds, r.consumed, r.reserved, a.*
+		FROM e, r, a`, userID, st.Limit, s.cfg.AIGenerationWindow.Milliseconds()).
 		Scan(&e.Plan, &e.Status, &e.PeriodStart, &e.PeriodEnd, &e.QuotaSeconds,
-			&u.ConsumedSeconds, &u.ReservedSeconds, &u.AIGenerations.UsedLast24h, &next)
+			&u.ConsumedSeconds, &u.ReservedSeconds, &st.Used, &st.Reserved, &next)
 	if err != nil {
 		return Usage{}, err
 	}
 	u.Entitlement = EntitlementView{Plan: e.Plan, Status: e.Status, PeriodStart: jsonx.NewTime(e.PeriodStart),
 		PeriodEnd: jsonx.NewTime(e.PeriodEnd), QuotaSeconds: e.QuotaSeconds}
 	u.RemainingSeconds = max(0, e.QuotaSeconds-u.ConsumedSeconds-u.ReservedSeconds)
-	u.AIGenerations.LimitPerDay = limit
-	if u.AIGenerations.UsedLast24h >= limit {
-		u.AIGenerations.NextAvailableAt = jsonx.TimePtr(next)
+	st.Remaining = max(0, st.Limit-st.Used-st.Reserved)
+	u.AIGenerations = AIGenerations{Limit: st.Limit, WindowHours: int(s.cfg.AIGenerationWindow / time.Hour),
+		Used: st.Used, Reserved: st.Reserved, Remaining: st.Remaining}
+	if st.Remaining == 0 {
+		u.AIGenerations.NextSlotAt = jsonx.TimePtr(next)
 	}
 	return u, nil
 }

@@ -58,6 +58,7 @@ final class AppModel {
     @ObservationIgnored let auth: AuthStore
     @ObservationIgnored private let defaults: UserDefaults
     @ObservationIgnored private var started = false
+    @ObservationIgnored private var isSigningOut = false
     @ObservationIgnored private var revokeObserver: NSObjectProtocol?
     let connectivity = Connectivity()
     let toasts = ToastCenter()
@@ -87,14 +88,14 @@ final class AppModel {
         self.api = APIClient(
             baseURL: baseURL,
             session: urlSession,
-            tokenProvider: { auth.token },
+            tokens: auth,
             onUnauthenticated: { Task { @MainActor in relay.fire() } }
         )
         self.serverConfig = Self.load(ServerConfig.self, key: DefaultsKey.serverConfig, from: defaults)
         self.usage = Self.load(UsageDTO.self, key: DefaultsKey.usage, from: defaults)
         self.usageFetchedAt = defaults.object(forKey: DefaultsKey.usageFetchedAt) as? Date
 
-        if auth.token != nil, let userID = auth.userID,
+        if auth.tokens != nil, let userID = auth.userID,
            let user = Self.load(UserDTO.self, key: DefaultsKey.currentUser, from: defaults), user.id == userID {
             self.user = user
             self.session = defaults.bool(forKey: DefaultsKey.onboardingCompleted) ? .signedIn(user) : .onboarding(.language)
@@ -172,7 +173,7 @@ final class AppModel {
     }
 
     func didSignIn(_ response: AuthResponseDTO, method: SignInMethod, appleUserID: String? = nil) {
-        auth.saveSession(token: response.token, userID: response.user.id, method: method)
+        auth.saveSession(tokens: response.tokens, userID: response.user.id, method: method)
         if let appleUserID { auth.set(appleUserID, for: .appleUserID) }
         auth.set(nil, for: .pendingDisplayName)
         signOutReason = nil
@@ -195,6 +196,9 @@ final class AppModel {
     }
 
     func signOut(reason: SignOutReason, callServer: Bool = true) async {
+        guard !isSigningOut else { return }
+        isSigningOut = true
+        defer { isSigningOut = false }
         if callServer { _ = try? await api.send(Endpoints.logout()) }
         services = .placeholder()
         // Signed-in views still run @Query updates while being torn down; deallocating the container under them traps in SwiftData.
@@ -219,8 +223,9 @@ final class AppModel {
         session = .signedOut
     }
 
+    // Terminal 401 only: a refresh that fails over the network never lands here.
     func handleUnauthenticated() {
-        guard user != nil else { return }
+        guard user != nil, !isSigningOut else { return }
         Task { await signOut(reason: .unauthenticated, callServer: false) }
     }
 

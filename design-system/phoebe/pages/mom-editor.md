@@ -88,7 +88,7 @@ AI notes reuse this editor with sections of text items only (no meeting info, no
 | Viewing old version (read-only) | banner `version.viewing` "Anda melihat v2 (hanya baca)"; fields disabled (read-only styling distinct from disabled: normal text, no field chrome) | Pulihkan versi ini / Kembali ke terbaru |
 | Regenerating | inline ProgressView banner `mom.generating`; current version stays editable; when ready, banner "Versi baru v4 siap" + "Buka" (doesn't replace current view) | Buka |
 | Regenerate failed | danger banner `mom.failed` | Coba lagi |
-| Regenerate rate-limited | menu item disabled + `doc.regen.limited` (time from `/v1/usage.ai_generations.next_available_at`, so it is shown before tapping) | — |
+| Regenerate rate-limited | menu item disabled + `doc.regen.limited` (time from `/v1/usage.ai_generations.next_slot_at`, so it is shown before tapping) | — |
 | Regenerate with unsynced source edits | menu item disabled + `doc.regen.syncFirst` while this document's or the manual notes' edit is pending/offline/in conflict | — |
 | AI failed / quota exhausted | editor fully works; regenerate unavailable with reason | — |
 | Empty section | placeholder row "Belum ada isi" + "Tambah" | — |
@@ -198,6 +198,6 @@ Session-scoped `UndoManager` per editor screen: text edits (coalesced per item p
 ## Interactions
 - Autosave: debounce 1 s after last edit (budget ≤2 s), write the draft's wire form into `PendingDocumentEdit.content` (ios.md §4/§10; an in-flight request keeps its own frozen snapshot); sync engine sends `PUT /v1/meetings/{id}/documents/{kind}` with `expected_revision`, `base_revision`, `mutation_id`. Edits typed while a save is in flight are sent next, never dropped. 409 → conflict sheet. Event `document_saved` on 2xx.
 - Review: `PUT /v1/meetings/{id}/documents/{kind}/review {status, expected_revision}` after pending edits are pushed (no new revision; nothing is sent to anyone). Offline: button disabled with footnote `review.offline`.
-- Regenerate: first push pending `manual_notes` (and for MoM `ai_notes`) edits; then `POST …/documents/mom/generate` (or `ai_notes/generate`) with a persisted `Idempotency-Key`; `429 rate_limited` → `doc.regen.limited` with `retry_after_seconds`.
+- Regenerate: first push pending `manual_notes` (and for MoM `ai_notes`) edits; then `POST …/documents/mom/generate` (or `ai_notes/generate`) with a persisted `Idempotency-Key`; `429 ai_generation_limit` → refresh `/v1/usage`, `doc.regen.limited` ("Batas generasi AI tercapai. Slot berikutnya tersedia <time>." / "AI generation limit reached. Next slot available <time>.") with `next_slot_at`.
 - Ekspor → Export & share sheet for this document; if unsynced edits exist, export waits for sync (see export page).
-- Source ref tap → plays audio in a compact inline player sheet (`.presentationDetents([.height(160)])`) with the segment text, so the user doesn't lose their editing place.
+- Source ref tap → plays audio in a compact inline player sheet (`.presentationDetents([.height(160)])`) with the segment text, so the user doesn't lose their editing place. Its range shows `~mm:ss–~mm:ss` for approximate (chunk-timed) refs, VoiceOver "sekitar …" / "about …".

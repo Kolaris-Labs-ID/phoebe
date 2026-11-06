@@ -143,6 +143,7 @@ func TestDeleteAccount(t *testing.T) {
 		`SELECT count(*) FROM meetings WHERE user_id = $1 AND deleted_at IS NULL`:                            0,
 		`SELECT count(*) FROM deleted_meetings WHERE user_id = $1`:                                           2,
 		`SELECT count(*) FROM sessions WHERE user_id = $1 AND revoked_at IS NULL`:                            0,
+		`SELECT count(*) FROM sessions WHERE user_id = $1 AND revoked_reason <> 'account_deleted'`:           0,
 		`SELECT count(*) FROM upload_sessions WHERE user_id = $1 AND status IN ('open', 'verifying')`:        0,
 		`SELECT count(*) FROM jobs WHERE user_id = $1 AND status IN ('queued', 'running')`:                   0,
 		`SELECT count(*) FROM quota_reservations WHERE user_id = $1 AND status = 'reserved'`:                 0,
@@ -157,7 +158,7 @@ func TestDeleteAccount(t *testing.T) {
 		t.Fatal("running job not canceled")
 	}
 	for _, tok := range []string{u.Token, token2} {
-		if _, _, err := authSvc.ResolveSession(ctx, tok); !apperr.Is(err, apperr.Unauthenticated) {
+		if _, _, err := authSvc.ResolveSession(ctx, tok); !apperr.Is(err, apperr.SessionRevoked) {
 			t.Fatal("old session still valid:", err)
 		}
 	}
@@ -293,8 +294,11 @@ func TestTrialAbuseAfterAccountDelete(t *testing.T) {
 	if err != nil || !second.Created || second.User.ID == first.User.ID || quota(second.User.ID) != 0 {
 		t.Fatalf("re-sign-in: %+v %v quota=%d", second, err, quota(second.User.ID))
 	}
-	if _, _, err := authSvc.ResolveSession(ctx, first.Token); !apperr.Is(err, apperr.Unauthenticated) {
+	if _, _, err := authSvc.ResolveSession(ctx, first.AccessToken); !apperr.Is(err, apperr.SessionRevoked) {
 		t.Fatal(err)
+	}
+	if _, err := authSvc.Refresh(ctx, first.RefreshToken); !apperr.Is(err, apperr.SessionRevoked) {
+		t.Fatal("refresh after delete:", err)
 	}
 
 	exec(t, pool, `UPDATE jobs SET run_after = now()`)

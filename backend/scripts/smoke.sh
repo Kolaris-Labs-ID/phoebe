@@ -51,7 +51,26 @@ public() { local t=$TOKEN; TOKEN=""; req "$@"; TOKEN=$t; }
 step "dev login"
 req POST /v1/auth/dev "{\"subject\":\"smoke-$(date +%s)\"}"
 expect 200 "dev login"
-TOKEN=$(j .token)
+TOKEN=$(j .access_token)
+REFRESH=$(j .refresh_token)
+SESSION_EXP=$(j .session_expires_at)
+[ -n "$TOKEN" ] && [ "$TOKEN" != null ] && [ "$REFRESH" != null ] || fail "login token pair"
+
+step "refresh rotates the pair"
+public POST /v1/auth/refresh "{\"refresh_token\":\"$REFRESH\"}"
+expect 200 "refresh"
+[ "$(j .session_expires_at)" = "$SESSION_EXP" ] || fail "refresh moved session_expires_at"
+[ "$(j .refresh_token)" != "$REFRESH" ] || fail "refresh token not rotated"
+OLD_TOKEN=$TOKEN
+TOKEN=$(j .access_token)
+REFRESH=$(j .refresh_token)
+req GET /v1/me
+expect 200 "me with refreshed token"
+NEW_TOKEN=$TOKEN
+TOKEN=$OLD_TOKEN
+req GET /v1/me
+expect 200 "old access token valid until it expires"
+TOKEN=$NEW_TOKEN
 
 step "create meeting"
 MID=$(uuid)
@@ -68,9 +87,9 @@ HALF=$((SIZE / 2))
 head -c "$HALF" "$WORK/a.wav" >"$WORK/c1"
 tail -c "+$((HALF + 1))" "$WORK/a.wav" >"$WORK/c2"
 
-step "upload session with auto transcription"
+step "upload session with auto transcription (notes auto)"
 TKEY=$(uuid)
-req POST "/v1/meetings/$MID/uploads" "{\"size_bytes\":$SIZE,\"sha256\":\"$SHA\",\"content_type\":\"audio/x-wav\",\"duration_ms\":60000,\"transcription\":{\"idempotency_key\":\"$TKEY\",\"language\":\"id\"}}"
+req POST "/v1/meetings/$MID/uploads" "{\"size_bytes\":$SIZE,\"sha256\":\"$SHA\",\"content_type\":\"audio/x-wav\",\"duration_ms\":60000,\"transcription\":{\"idempotency_key\":\"$TKEY\",\"language\":\"id\",\"notes\":\"auto\"}}"
 expect 201 "create upload"
 UPID=$(j .upload.id)
 
@@ -86,20 +105,29 @@ expect 200 "chunk 2"
 [ "$(j .audio.content_type)" = audio/wav ] || fail "detected content type"
 JOB=$(j .job.id)
 [ "$JOB" != null ] || fail "auto-start job missing"
+[ "$(j .transcription_blocked)" = null ] || fail "transcription_blocked with free slots"
 
 step "complete (idempotent confirm)"
 req POST "/v1/uploads/$UPID/complete"
 expect 200 "complete"
 [ "$(j .job.id)" = "$JOB" ] || fail "complete returned another job"
 
-step "explicit transcription with the auto-start key (replay)"
-req POST "/v1/meetings/$MID/transcription" '{"language":"id"}' -H "Idempotency-Key: $TKEY"
+step "explicit transcription with the auto-start key (replay, with and without notes)"
+req POST "/v1/meetings/$MID/transcription" '{"language":"id","notes":"auto"}' -H "Idempotency-Key: $TKEY"
 expect 200 "transcription replay"
 [ "$(j .job.id)" = "$JOB" ] || fail "replay returned another job"
+req POST "/v1/meetings/$MID/transcription" '{"language":"id"}' -H "Idempotency-Key: $TKEY"
+expect 200 "transcription replay without notes (default auto)"
+[ "$(j .job.id)" = "$JOB" ] || fail "replay without notes returned another job"
 
-poll() { # poll JQ-EXPR WANT FAILVALUE
+req GET /v1/usage
+expect 200 "usage during transcription"
+# The worker may already have finished notes (slot consumed); either way exactly one slot is held.
+[ "$(j '.ai_generations.reserved + .ai_generations.used')" = 1 ] || fail "auto notes slot not reserved with the transcription"
+
+poll() { # poll JQ-EXPR WANT FAILVALUE (meeting ${PMID:-$MID})
   for _ in $(seq 1 150); do
-    req GET "/v1/meetings/$MID"
+    req GET "/v1/meetings/${PMID:-$MID}"
     expect 200 "get meeting"
     local v; v=$(j "$1")
     [ "$v" = "$2" ] && return 0
@@ -116,6 +144,11 @@ poll .meeting.pipeline_state notes_ready notes_failed
 req GET "/v1/meetings/$MID/transcript"
 expect 200 "transcript"
 [ "$(j '.revision.segments | length')" -ge 1 ] || fail "no segments"
+[ "$(j .revision.timing)" = chunk ] || fail "fake STT timing must be chunk"
+[ "$(j '[.revision.segments[] | .uncertain] | all(. == false)')" = true ] || fail "uncertain flags"
+req GET "/v1/meetings/$MID/documents/ai_notes"
+expect 200 "ai notes"
+[ "$(j '[.. | objects | select(.type? == "transcript") | .approximate] | (length > 0) and all(. == true)')" = true ] || fail "ai notes refs not approximate"
 
 step "generate MoM"
 req POST "/v1/meetings/$MID/documents/mom/generate" '{"ai_notes_revision_id":null,"language":null}' -H "Idempotency-Key: $(uuid)"
@@ -149,6 +182,10 @@ for f in md docx pdf whatsapp; do
   [ "$(j .export.is_draft)" = false ] || fail "$f exported as draft"
   URL=$(j .download_url); BYTES=$(j .export.size_bytes); NAME=$(j .export.filename)
   case $f in md|whatsapp) [ "$(j .text)" != null ] || fail "$f text missing" ;; esac
+  if [ "$f" = md ]; then
+    j .text | grep -q '\[\\~[0-9]' || fail "md approximate ref [\\~mm:ss] missing"
+    j .text | grep -q '^\\~ = perkiraan waktu$' || fail "md approximate legend missing"
+  fi
   public GET "${URL#"$BASE"}" "" -D "$WORK/headers"
   expect 200 "download $f"
   [ "$(wc -c <"$WORK/body" | tr -d ' ')" = "$BYTES" ] || fail "$f size"
@@ -177,6 +214,31 @@ step "usage"
 req GET /v1/usage
 expect 200 "usage"
 [ "$(j .consumed_seconds)" = 60 ] || fail "consumed_seconds"
+[ "$(jq -c '.ai_generations | [.limit, .window_hours, .used, .reserved, .remaining, .next_slot_at]' "$WORK/body")" = '[30,24,2,0,28,null]' ] ||
+  fail "ai_generations (auto notes + MoM consumed)"
+
+step "transcription only (notes skip) → transcript_ready → generate notes"
+MID2=$(uuid)
+req POST /v1/meetings "{\"id\":\"$MID2\",\"title\":\"Smoke skip\",\"timezone\":\"Asia/Jakarta\",\"language\":\"id\"}"
+expect 201 "create meeting 2"
+ffmpeg -loglevel error -f lavfi -i "sine=frequency=330:duration=30" -ac 1 -ar 8000 -c:a pcm_s16le "$WORK/b.wav"
+SIZE2=$(wc -c <"$WORK/b.wav" | tr -d ' ')
+req POST "/v1/meetings/$MID2/uploads" "{\"size_bytes\":$SIZE2,\"sha256\":\"$(shasum -a 256 "$WORK/b.wav" | cut -d' ' -f1)\",\"content_type\":\"audio/wav\",\"duration_ms\":30000}"
+expect 201 "create upload 2"
+req PUT "/v1/uploads/$(j .upload.id)" "" -H 'Content-Type: application/octet-stream' -H "Upload-Offset: 0" --data-binary "@$WORK/b.wav"
+expect 200 "upload 2"
+[ "$(j .job)" = null ] && [ "$(j .transcription_blocked)" = null ] || fail "no auto-start requested"
+req POST "/v1/meetings/$MID2/transcription" '{"language":"id","notes":"skip"}' -H "Idempotency-Key: $(uuid)"
+expect 202 "transcription only"
+PMID=$MID2 poll .meeting.pipeline_state transcript_ready transcription_failed
+[ "$(j .meeting.documents.ai_notes)" = null ] || fail "skip generated notes"
+req GET /v1/usage
+[ "$(j .ai_generations.used)" = 2 ] && [ "$(j .ai_generations.reserved)" = 0 ] || fail "skip took a slot"
+req POST "/v1/meetings/$MID2/documents/ai_notes/generate" '{"language":null}' -H "Idempotency-Key: $(uuid)"
+expect 202 "generate notes from transcript_ready"
+PMID=$MID2 poll .meeting.pipeline_state notes_ready notes_failed
+req GET /v1/usage
+[ "$(jq -c '.ai_generations | [.used, .reserved, .remaining]' "$WORK/body")" = '[3,0,27]' ] || fail "notes from transcript_ready consumed one slot"
 
 step "delete meeting"
 req DELETE "/v1/meetings/$MID"
@@ -187,6 +249,16 @@ public GET "${EXPORT_URL#"$BASE"}"
 expect 404 "export after delete"
 req POST /v1/meetings "{\"id\":\"$MID\",\"timezone\":\"UTC\"}"
 expect 409 "recreate deleted id"
+
+step "logout revokes the session family"
+req POST /v1/auth/logout
+expect 204 "logout"
+req GET /v1/me
+expect 401 "me after logout"
+[ "$(j .error.code)" = session_revoked ] || fail "logout error code"
+public POST /v1/auth/refresh "{\"refresh_token\":\"$REFRESH\"}"
+expect 401 "refresh after logout"
+[ "$(j .error.code)" = session_revoked ] || fail "refresh after logout code"
 
 SMOKE_OK=1
 echo "SMOKE PASS"

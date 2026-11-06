@@ -161,13 +161,15 @@ type ActionItem struct {
 	Sources        []SourceRef `json:"sources"`
 }
 
-// SourceRef is {type:"transcript", segment_id, start_ms, end_ms} or {type:"user_notes", note_id}.
+// SourceRef is {type:"transcript", segment_id, start_ms, end_ms, approximate} or {type:"user_notes", note_id}.
+// Approximate is server-set from the transcript revision's timing ("chunk"), never from LLM or client input.
 type SourceRef struct {
-	Type      string
-	SegmentID string
-	StartMS   int64
-	EndMS     int64
-	NoteID    string
+	Type        string
+	SegmentID   string
+	StartMS     int64
+	EndMS       int64
+	Approximate bool
+	NoteID      string
 }
 
 func (*ManualNotes) Kind() Kind { return KindManualNotes }
@@ -178,11 +180,12 @@ func (r SourceRef) MarshalJSON() ([]byte, error) {
 	switch r.Type {
 	case RefTranscript:
 		return json.Marshal(struct {
-			Type      string `json:"type"`
-			SegmentID string `json:"segment_id"`
-			StartMS   int64  `json:"start_ms"`
-			EndMS     int64  `json:"end_ms"`
-		}{r.Type, r.SegmentID, r.StartMS, r.EndMS})
+			Type        string `json:"type"`
+			SegmentID   string `json:"segment_id"`
+			StartMS     int64  `json:"start_ms"`
+			EndMS       int64  `json:"end_ms"`
+			Approximate bool   `json:"approximate"`
+		}{r.Type, r.SegmentID, r.StartMS, r.EndMS, r.Approximate})
 	case RefUserNotes:
 		return json.Marshal(struct {
 			Type   string `json:"type"`
@@ -194,11 +197,12 @@ func (r SourceRef) MarshalJSON() ([]byte, error) {
 
 func (r *SourceRef) UnmarshalJSON(b []byte) error {
 	var v struct {
-		Type      string `json:"type"`
-		SegmentID string `json:"segment_id"`
-		StartMS   int64  `json:"start_ms"`
-		EndMS     int64  `json:"end_ms"`
-		NoteID    string `json:"note_id"`
+		Type        string `json:"type"`
+		SegmentID   string `json:"segment_id"`
+		StartMS     int64  `json:"start_ms"`
+		EndMS       int64  `json:"end_ms"`
+		Approximate bool   `json:"approximate"`
+		NoteID      string `json:"note_id"`
 	}
 	if err := json.Unmarshal(b, &v); err != nil {
 		return err

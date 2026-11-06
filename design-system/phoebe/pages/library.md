@@ -67,7 +67,7 @@ Derived from local phase + list-item fields (api §4.2: `pipeline_state`, `activ
 | MoM reviewed | `checkmark.seal.fill`, success | `status.reviewed` |
 | MoM draft | `pencil.circle`, neutral | `status.momDraft` |
 | Notes ready | `note.text`, success | `status.notesReady` |
-| Transcript ready (notes failed/not yet) | `text.quote`, success | `status.transcriptReady` |
+| Transcript ready (notes failed/not yet, or `pipeline_state` `transcript_ready` after "Transkrip saja") | `text.quote`, success | `status.transcriptReady` |
 
 Failure chip never hides the meeting; row remains openable.
 
@@ -102,7 +102,7 @@ Failure chip never hides the meeting; row remains openable.
 - `plus` menu → Rekam meeting baru (opens Recording pre-record), Impor audio (file importer; no mic permission requested).
 - Folder chips: horizontal scroll of folders, each ≥44pt high; "Semua" selected by default; selected chip uses `.fill` icon + accentSoft + bold text.
 - Polling: while any row has non-empty `active_job_types` or a local upload phase (`queued/uploading/verifying`), poll the first page of `GET /v1/meetings` with backoff 2 s ×1.5, cap 30 s, foreground only; reset on foreground / pull-to-refresh (api §4.5). Pull-to-refresh does a full pull and, if any meeting waits for quota/plan, refetches `GET /v1/usage`.
-- Import flow: file importer → validation (type, duration, size, storage) → **Import confirm sheet** (`.presentationDetents([.medium])`): file name + duration, `lock.shield` `import.confirm.cloud` (retention days from `ServerConfig`; if config was never fetched, `onb.privacy.retention.unknown` and "Unggah" stays disabled with footnote `import.confirm.waitConfig` until it is fetched), "Bahasa transkrip" `Picker` (Otomatis / Indonesia / English, default = Settings default; sets meeting `language`), Primary "Unggah" (`import.confirm.upload`), Cancel. Then streamed copy → upload.
+- Import flow: file importer → validation (type, duration, size, storage) → **Import confirm sheet** (`.presentationDetents([.medium])`): file name + duration, `lock.shield` `import.confirm.cloud` (retention days from `ServerConfig`; if config was never fetched, `onb.privacy.retention.unknown` and "Unggah" stays disabled with footnote `import.confirm.waitConfig` until it is fetched), "Bahasa transkrip" `Picker` (Otomatis / Indonesia / English, default = Settings default; sets meeting `language`), Primary "Unggah" (`import.confirm.upload`), Cancel. When `/v1/usage.ai_generations.remaining` is 0, the footer adds `import.confirm.aiSlot` (the wait / transcribe-only choice comes after upload, before any minutes are used; meeting-detail.md "AI slot choice"). Then streamed copy → upload.
 - Folder management sheet: list of folders, add (TextField, max 60 chars), rename, delete (meetings move to "Tanpa folder", confirm). One level only.
 - Tag management: same pattern; tag assign sheet on a meeting has search + create.
 
@@ -152,6 +152,7 @@ Failure chip never hides the meeting; row remains openable.
 | import.confirm.language | Bahasa transkrip | Transcript language |
 | import.confirm.upload | Unggah | Upload |
 | import.confirm.waitConfig | Menunggu info masa simpan dari server sebelum mengunggah. | Waiting for the retention policy from the server before uploading. |
+| import.confirm.aiSlot | Slot AI sedang habis. Setelah upload, Anda bisa menunggu slot atau transkrip saja; menit tidak terpakai sebelum Anda memilih. | No AI slot is left right now. After upload you can wait for one or transcribe only; no minutes are used before you choose. |
 | import.validating | Memeriksa file… | Checking file… |
 | import.copying | Menyalin file… %lld%% | Copying file… %lld%% |
 | import.error.type | File ini bukan audio M4A, MP3, atau WAV yang valid. | This file isn't a valid M4A, MP3, or WAV audio file. |

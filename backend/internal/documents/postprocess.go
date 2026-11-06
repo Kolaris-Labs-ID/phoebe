@@ -164,17 +164,20 @@ func mergeMoM(parts []llmMoM) llmMoM {
 // §6.3 post-processing.
 
 type segment struct {
-	ID      string `json:"id"`
-	StartMS int64  `json:"start_ms"`
-	EndMS   int64  `json:"end_ms"`
-	Text    string `json:"text"`
+	ID        string `json:"id"`
+	StartMS   int64  `json:"start_ms"`
+	EndMS     int64  `json:"end_ms"`
+	Text      string `json:"text"`
+	Uncertain bool   `json:"uncertain"`
 }
 
 // sources is everything a generated item may be checked against: the pinned transcript
-// segments and manual notes, plus the meeting metadata.
+// segments and manual notes, plus the meeting metadata. approximate comes from the pinned
+// transcript revision's timing, never from LLM output.
 type sources struct {
 	segIndex     map[string]int
 	segments     []segment
+	approximate  bool
 	notes        map[string]string // nil = manual notes not pinned
 	participants []string
 	meetingDate  *time.Time
@@ -197,7 +200,7 @@ func newSources(segs []segment, notes *ManualNotes, participants []string, meeti
 }
 
 func (s *sources) pins() Pins {
-	p := Pins{Segments: make(map[string]Span, len(s.segments))}
+	p := Pins{Segments: make(map[string]Span, len(s.segments)), Approximate: s.approximate}
 	for _, g := range s.segments {
 		p.Segments[g.ID] = Span{g.StartMS, g.EndMS}
 	}
@@ -233,7 +236,8 @@ func (s *sources) resolve(refs, noteRefs []string) resolved {
 	var texts []string
 	for _, i := range idx {
 		g := s.segments[i]
-		out.refs = append(out.refs, SourceRef{Type: RefTranscript, SegmentID: g.ID, StartMS: g.StartMS, EndMS: g.EndMS})
+		out.refs = append(out.refs, SourceRef{Type: RefTranscript, SegmentID: g.ID, StartMS: g.StartMS, EndMS: g.EndMS,
+			Approximate: s.approximate})
 		texts = append(texts, g.Text)
 	}
 	out.transcript = len(out.refs)

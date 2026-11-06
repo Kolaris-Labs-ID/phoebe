@@ -12,7 +12,6 @@ import (
 	"phoebe/internal/apperr"
 	"phoebe/internal/config"
 	"phoebe/internal/db"
-	"phoebe/internal/jsonx"
 	"phoebe/internal/usage"
 	"phoebe/internal/users"
 )
@@ -33,10 +32,9 @@ func NewService(pool *pgxpool.Pool, cfg *config.Config, log *slog.Logger, apple 
 }
 
 type Result struct {
-	Token     string      `json:"token"`
-	ExpiresAt jsonx.Time  `json:"expires_at"`
-	Created   bool        `json:"created"`
-	User      *users.User `json:"user"`
+	User *users.User `json:"user"`
+	Tokens
+	Created bool `json:"created"`
 }
 
 type AppleSignIn struct {
@@ -148,7 +146,7 @@ func (s *Service) signInTx(ctx context.Context, tx pgx.Tx, id identity, name str
 			return nil, err
 		}
 	}
-	token, exp, err := CreateSession(ctx, tx, uid, s.cfg.SessionTTL)
+	t, err := s.createSession(ctx, tx, uid)
 	if err != nil {
 		return nil, err
 	}
@@ -156,7 +154,7 @@ func (s *Service) signInTx(ctx context.Context, tx pgx.Tx, id identity, name str
 	if err != nil {
 		return nil, err
 	}
-	return &Result{Token: token, ExpiresAt: jsonx.NewTime(exp), Created: created, User: u}, nil
+	return &Result{User: u, Tokens: *t, Created: created}, nil
 }
 
 // grantEntitlement: one trial per identity ever (trial_grants survives account purge).

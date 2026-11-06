@@ -8,15 +8,15 @@ enum Fixtures {
     """
 
     static let aiNotes = """
-    {"schema_version":1,"language":"id","sections":[{"id":"sec_1","heading":"Budget Q1","style":"bullet","items":[{"id":"it_1","text":"Budget marketing naik 10%.","origin":"ai","edited":false,"sources":[{"type":"transcript","segment_id":"s12","start_ms":61000,"end_ms":66000}]}]}]}
+    {"schema_version":1,"language":"id","sections":[{"id":"sec_1","heading":"Budget Q1","style":"bullet","items":[{"id":"it_1","text":"Budget marketing naik 10%.","origin":"ai","edited":false,"sources":[{"type":"transcript","segment_id":"s12","start_ms":61000,"end_ms":66000,"approximate":false}]}]}]}
     """
 
     static let mom = """
     {"schema_version":1,"language":"id","meeting_info":{"title":"Weekly sync","started_at":"2026-11-06T02:00:00.000Z","timezone":"Asia/Jakarta","participants":["Budi","Sari"],"agenda":[{"id":"it_1","text":"Budget","origin":"ai","edited":false,"sources":[]}]},"sections":[\
-    {"id":"summary","type":"summary","heading":"Ringkasan","style":"paragraph","items":[{"id":"it_2","text":"Ringkas.","origin":"ai","edited":true,"sources":[{"type":"transcript","segment_id":"s1","start_ms":0,"end_ms":4200}]}]},\
+    {"id":"summary","type":"summary","heading":"Ringkasan","style":"paragraph","items":[{"id":"it_2","text":"Ringkas.","origin":"ai","edited":true,"sources":[{"type":"transcript","segment_id":"s1","start_ms":0,"end_ms":4200,"approximate":false}]}]},\
     {"id":"discussion","type":"discussion","heading":"Pembahasan","style":"bullet","items":[{"id":"it_4","title":"Rencana rilis","origin":"ai","edited":false,"sources":[],"points":[{"id":"it_5","text":"Rilis Desember","origin":"ai","edited":false,"sources":[{"type":"user_notes","note_id":"n3"}]}]}]},\
     {"id":"decisions","type":"decisions","heading":"Keputusan","style":"numbered","items":[]},\
-    {"id":"action_items","type":"action_items","heading":"Action items","style":null,"items":[{"id":"it_9","description":"Siapkan laporan vendor","pic":"Budi","deadline":"2026-11-13","deadline_phrase":"minggu depan","origin":"ai","edited":false,"sources":[{"type":"transcript","segment_id":"s42","start_ms":734000,"end_ms":741500}]},{"id":"h_1","description":"Cek kontrak","pic":null,"deadline":null,"deadline_phrase":null,"origin":"human","edited":false,"sources":[]}]},\
+    {"id":"action_items","type":"action_items","heading":"Action items","style":null,"items":[{"id":"it_9","description":"Siapkan laporan vendor","pic":"Budi","deadline":"2026-11-13","deadline_phrase":"minggu depan","origin":"ai","edited":false,"sources":[{"type":"transcript","segment_id":"s42","start_ms":734000,"end_ms":741500,"approximate":true}]},{"id":"h_1","description":"Cek kontrak","pic":null,"deadline":null,"deadline_phrase":null,"origin":"human","edited":false,"sources":[]}]},\
     {"id":"open_issues","type":"open_issues","heading":"Hal terbuka","style":"bullet","items":[]},\
     {"id":"follow_ups","type":"follow_ups","heading":"Tindak lanjut","style":"bullet","items":[]},\
     {"id":"h_2","type":"custom","heading":"Catatan lain","style":"bullet","items":[{"id":"h_3","text":"Lain","origin":"human","edited":false,"sources":[]}]}]}
@@ -162,5 +162,60 @@ enum Fixtures {
 
         let listing = json.replacingOccurrences(of: ",\"content\":\(Fixtures.aiNotes)", with: "")
         #expect(try APICoding.decoder().decode(DocumentRevisionDTO.self, from: Data(listing.utf8)).content == nil)
+    }
+
+    @Test func approximateRefRoundTripsAndAbsentMeansExact() throws {
+        let mom = try APICoding.decoder().decode(MoMContent.self, from: Data(Fixtures.mom.utf8))
+        guard case .action(let action) = mom.sections.first(where: { $0.id == "action_items" })?.items.first else { Issue.record("action"); return }
+        #expect(action.sources == [.transcript(segmentId: "s42", startMs: 734000, endMs: 741500, approximate: true)])
+        let legacy = try APICoding.decoder().decode(SourceRef.self, from: Data(#"{"type":"transcript","segment_id":"s1","start_ms":0,"end_ms":10}"#.utf8))
+        #expect(legacy == .transcript(segmentId: "s1", startMs: 0, endMs: 10, approximate: false))
+    }
+
+    @Test func chunkTimingIsCopiedOntoSegmentsAndSurvivesLocalStorage() throws {
+        let json = """
+        {"id":"7d9f8e2a-0000-4000-8000-000000000003","revision_number":2,"kind":"correction","language":"id","timing":"chunk","created_at":"2026-11-06T02:00:00.000Z",        "segments":[{"id":"s1","start_ms":0,"end_ms":30000,"text":"Halo","uncertain":false,"uncertain_reason":null},        {"id":"s2","start_ms":30000,"end_ms":60000,"text":"Budget lima puluh","uncertain":true,"uncertain_reason":"low_confidence"}]}
+        """
+        let dto = try APICoding.decoder().decode(TranscriptRevisionDTO.self, from: Data(json.utf8))
+        #expect(dto.timing == .chunk)
+        let segments = try #require(dto.segments)
+        #expect(segments.allSatisfy { $0.isApproximate })
+        #expect(segments.map(\.uncertain) == [false, true])
+        #expect(segments[1].uncertainReason == "low_confidence")
+
+        let stored = try APICoding.encoder().encode(segments)
+        #expect(try APICoding.decoder().decode([TranscriptSegment].self, from: stored) == segments)
+
+        let segmentTimed = json.replacingOccurrences(of: #""timing":"chunk""#, with: #""timing":"segment""#)
+        #expect(try APICoding.decoder().decode(TranscriptRevisionDTO.self, from: Data(segmentTimed.utf8)).segments?.contains(where: \.isApproximate) == false)
+    }
+
+    @Test func locallyCachedSegmentsWithoutNewFieldsDefaultToApproximateAndCertain() throws {
+        let cached = try APICoding.decoder().decode([TranscriptSegment].self, from: Data(#"[{"id":"s1","start_ms":0,"end_ms":10,"text":"a"}]"#.utf8))
+        #expect(cached.first?.timing == .chunk)
+        #expect(cached.first?.uncertain == false)
+    }
+
+    @Test func transcriptionBodiesCarryNotesMode() throws {
+        #expect(Fixtures.string(APICoding.encode(TranscriptionRequest(language: .id, notes: .skip))) == #"{"language":"id","notes":"skip"}"#)
+        let legacy = try APICoding.decoder().decode(TranscriptionRequest.self, from: Data(#"{"language":"en"}"#.utf8))
+        #expect(legacy == TranscriptionRequest(language: .en, notes: .auto))
+        let key = UUID()
+        let start = Fixtures.string(APICoding.encode(TranscriptionStart(idempotencyKey: key, language: .auto, notes: .skip)))
+        #expect(start == #"{"idempotency_key":"\#(key.lower)","language":"auto","notes":"skip"}"#)
+    }
+
+    @Test func correctionSendsResolvedUncertainSegments() throws {
+        let body = TranscriptCorrectionRequest(expectedRevision: 2, mutationId: UUID(), edits: [SegmentEdit(segmentId: "s2", text: "Budget 50")], resolvedUncertainSegmentIds: ["s2"])
+        let json = try #require(JSONSerialization.jsonObject(with: APICoding.encode(body)) as? [String: Any])
+        #expect(json["resolved_uncertain_segment_ids"] as? [String] == ["s2"])
+    }
+
+    @Test func uploadResultDecodesTranscriptionBlocked() throws {
+        let session = #"{"id":"7d9f8e2a-0000-4000-8000-000000000004","meeting_id":"7d9f8e2a-0000-4000-8000-000000000005","status":"completed","content_type":"audio/mp4","size_bytes":10,"received_bytes":10,"sha256":"abc","duration_ms":60000,"chunk_max_bytes":10,"failure_reason":null,"auto_transcription":true,"expires_at":"2026-11-06T02:00:00.000Z","created_at":"2026-11-06T02:00:00.000Z"}"#
+        let json = #"{"upload":\#(session),"audio":null,"job":null,"transcription_blocked":{"code":"ai_generation_limit","next_slot_at":"2026-11-06T05:00:00.000Z"}}"#
+        let result = try APICoding.decoder().decode(UploadResultDTO.self, from: Data(json.utf8))
+        #expect(result.job == nil)
+        #expect(result.transcriptionBlocked == TranscriptionBlockedDTO(code: "ai_generation_limit", nextSlotAt: APICoding.parseDate("2026-11-06T05:00:00.000Z")))
     }
 }

@@ -17,7 +17,7 @@ enum OutboxResult: Equatable {
         switch error {
         case .unauthenticated, .offline: .stop
         case .notFound: .missing
-        case .uploadBusy, .jobInProgress, .rateLimited: .retry
+        case .uploadBusy, .jobInProgress: .retry
         default:
             if error.isAmbiguous { .retry }
             else if case .decoding = error { .retry }

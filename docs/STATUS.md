@@ -1,104 +1,139 @@
 # Phoebe MVP status
 
-Verified 2026-11-06 on macOS with Go 1.27, Xcode 26.5, iPhone 16 simulator (iOS 18.2), Postgres 16 (docker compose, host port 55432), fake STT/LLM providers, dev login.
+Re-verified 2026-11-06 after the final fix pass: backend vet, tests and smoke plus iOS unit tests were re-run; the iOS E2E and screenshot suites were not (§2). **All results here come from mock (fake) providers.** No real STT or LLM call, no physical device and no real Apple account has been used yet. Anything that needs those is listed in §3 and §4.
 
-## Test suites
+Environment: macOS 26.6.2, Go 1.27.3 (darwin/amd64), Xcode 26.5 (17F42), iPhone 16 simulator on iOS 18.2 (22C150, fresh simulator), Postgres 16.13 (root `docker-compose.yml`, host port 55432). Providers: `STT_PROVIDER=fake` (chunk timing, same as the default real model), `LLM_PROVIDER=fake`. Auth: dev login.
+
+## 1 Completed features (mock providers)
+
+Evidence key: **go** = `go test ./...` test name, **smoke** = `backend/scripts/smoke.sh` step, **iOS** = PhoebeTests suite, **E2E** = `PhoebeUITests/E2EFlowTests` test, **shot** = file under `ios/screenshots/` (`e2e/` = E2E run against the real api + worker, `{light,dark,xl}-*` = `ScreenshotTests` against `tools/mock_api.py`, plus `-13…15` from `testAISlotChoice`).
+
+| PRD ID | What works | Evidence |
+|---|---|---|
+| REC-01 Recording | Segmented AAC capture with rotation that doesn't restart the engine; pause isn't counted; crash recovery keeps valid segments; never auto-starts the mic; merge on device | iOS `RecordingEngineTests`, `RecordingStateMachineTests`, `RecordingRecoveryTests`, `SegmentMergerTests` (60 × 2-min segments, merged ≤ sum + 1 s); shot `*-11-recording-ready`, `*-12-recording-permission`. **Live capture was not run**: E2E `testRecordShortMeeting` skipped (§4) |
+| REC-02 Interruptions | Interruption, route loss and media-services reset close the segment and show "Paused by interruption" without auto-resume; storage preflight and safe stop when storage is low | iOS `RecordingStateMachineTests`, `RecordingEngineTests`, `RecordingFeatureTests.interruptionBannerIsPersistentAndRouteBannerAutoDismisses`. Device check outstanding (§4) |
+| REC-03 Notes during meeting | Manual notes autosave locally and are kept as a separate artifact that the AI treats as hints | iOS `MeetingDetailFeatureTests.manualNotesSaveState`; go `TestFabricationGuards` (a decision backed only by notes → open issue); E2E `testImportToExport` (personal note, `e2e-17-personal-note`) |
+| IMP-01 Import | m4a/mp3/wav checked by content, not by extension; limits come from the server (120 min, 250 MB); streamed copy | iOS `ImportValidatorTests`, `ImportCopierTests`; go `TestProbe*`, `TestVerifyRejections`, `TestProbeDurationLimitBoundary` (7 200 000 ms accepted, +1 ms rejected); E2E `testImportToExport` (`e2e-02-picker`, `e2e-03-import-confirm`) |
+| TRN-01 Transcript | Worker transcribes only after upload verification (session + checksum). Chunk timing uses our ~30 s silence-aligned windows, labeled **approximate** in the API (`timing: chunk`, refs `approximate: true`), in the UI (`~mm:ss`, VoiceOver "sekitar …", chunk-timing note), in source refs and in exports (`[~mm:ss]` + legend). Low-confidence text is flagged "Perlu ditinjau", never dropped on logprob alone. Corrections create new revisions. Tap a segment to play | go `TestTimingAndUncertainPersisted`, `TestApproximateRefsFromTiming`, `TestCorrection`, `TestCorrectionResolveOnly`, `TestChunkModeShortSpeechInSilentWindowKept`, `TestChunkModeUncertaintyAndDropRule`, `TestChunkModeSilentWindowSkipped`, `TestNoSpeech`; smoke "poll until notes_ready" (chunk-timed transcript); E2E `testImportToExport` (`e2e-06-detail-transcript`: `~00:00`, "sekitar 0 detik"), `testRestoreFromServer` (`e2e-restore-03b-uncertain` → "Teks sudah benar" → `POST …/transcript/revisions` 201 → `e2e-restore-03d-resolved`; playback `e2e-restore-04-playing`) |
+| AI-01 Notes and MoM | Notes generate automatically after the transcript; MoM is generated when the user asks; validated structure with segment refs; long input is chunked and merged | go `TestNotesJobSuccess`, `TestMoMJobAndDroppedItems`, `TestChunkedGeneration`, `TestChunkMerge`; smoke "generate MoM"; E2E `testImportToExport` (`e2e-07-detail-notes`, `e2e-09-mom-ready`) |
+| AI-02 Output rules | No invented PIC, deadline, numbers or decisions; "belum ditentukan"; transcript is treated as data (prompt-injection guard); only uncertain segments are marked in the prompt | go `TestFabricationGuards`, `TestNumberGuard`, `TestDeadlineNeedsMeetingDate`, `TestPromptInjectionContainment`, `TestPromptMarksUncertainSegments` |
+| AI-03 Models and failures | Adapters live on the backend only (no model names in iOS); at most 2 retries on API failure or invalid JSON; no cross-provider fallback; DeepSeek `thinking` param sent per task | go `TestInvalidOutputRetriedThenSucceeds`, `TestInvalidOutputRetried`, `TestProviderTimeout`, `TestRetryThenPermanentAfterMaxAttempts`, `TestDeepSeekThinkingParam`, `TestSelectByConfig`, `TestModelCapabilities` (all against canned `httptest` responses, not real providers) |
+| AI generation limit (PO decision) | 30 per rolling 24 h per user. The slot is reserved before transcription when automatic notes are on. With none left, the user gets "wait" or "transcribe only" **before** any quota is reserved. A reserved auto-notes job finishes even at the limit. Retries reuse the slot; permanent failure releases it; duplicates never take a second slot. Settings shows "30 generasi AI per 24 jam · Sisa n" and the next slot time | go `TestStartGenerationLimit`, `TestAutoStartBlockedByGenerationLimit`, `TestReservedAutoNotesFinishesAtLimit`, `TestGenerationSlotRace` (usage + documents), `TestGenerateSlotIdempotency`, `TestNoSpeechReleasesSlot`, `TestSlotTransitions`, `TestGenerationSlotWindow`, `TestAllowanceThroughProductionWiring`; smoke "usage" + "transcription only (notes skip)"; iOS `AllowanceTests`; E2E `testAISlotChoice` (`e2e-ai-01…05`; shot `*-13-ai-slot-choice`, `*-14-ai-slot-waiting`, `*-15-transcript-only`), `testImportToExport` (`e2e-21-settings-allowance`, "Sisa 28") |
+| DOC-01 Separate versioned artifacts | Manual notes, AI notes, transcript and MoM are separate; every generation records its source revision; edits, regenerate and restore create new revisions; stale outputs are labeled "Berdasarkan versi lama"; expected-revision checks | go `TestRevisionConflictAndMutationReplay`, `TestRestoreAfterRegenerate`, `TestKeepMineProvenanceAndStaleness`; iOS `SyncEngineTests`; smoke "edit MoM with expected_revision" (stale → 409); E2E (`v2 · Diedit`, "Berdasarkan versi lama" after a personal note) |
+| DOC-02 MoM structure | Info, summary, discussion, decisions, action items (PIC/deadline may be empty), open issues, follow-up | go `TestValidateMoM*`; iOS `DocumentContentTests` |
+| DOC-03 Editor | Edit/add/delete items and sections; undo; local autosave; Draft/Reviewed, where any edit reverts to Draft; origin shown without relying on color | iOS `EditorDraftTests`, `SyncEngineTests`; go `TestReviewAndChangeDetection`; E2E (`e2e-10…12-editor*`) |
+| ORG-01 Library | Rename, date, participants, one-level folders, tags, newest first, owner-only search of title/tag/text | go `TestListSearchFilterPagination`, `TestFoldersAndTags`, `TestPatchMetadataConflictAndLWW`; iOS `LibraryStatusTests`; E2E `testRestoreFromServer` (search, `e2e-restore-05b-tagged`), `testImportToExport` (rename, `e2e-18-renamed`) |
+| EXP-01 / EXP-02 Exports | PDF, DOCX, MD and WhatsApp text are deterministic from one revision snapshot with no LLM call; Draft label only when unreviewed; no IDs or URLs in output; identical decisions, PIC, deadlines and numbers across formats; PDF embeds Noto Sans with DejaVu Sans fallback | go `TestDeterministic`, `TestExportConsistency`, `TestServiceExportConsistencyAndDraft`, `TestDraftLabelIffUnreviewed`, `TestNoIdsOrURLsInOutput`, `TestApproximateRefs`, `TestPDFFontFallback`, `TestDOCXFonts`, `TestGolden`; smoke "export md / docx / pdf / whatsapp + signed download" (all 4 formats, file signatures); E2E PDF export + preview (`e2e-13…14`) |
+| SHR-01 Share | Native share sheet with the exported file | E2E `testImportToExport` (`e2e-15-share-sheet`). The simulator offers only Copy/Markup/Print/Save to Files; WhatsApp is untested (§4) |
+| ACC-01 Account and sync | Sign in with Apple, verified server-side (test keys only); dev login; Keychain tokens; data keyed by internal user ID; offline outbox with revision conflicts | go `TestVerifyAppleToken`, `TestSignInApple*`, `TestAppleExchangeAndRevoke`; iOS `SyncEngineTests`, `APIClientTests`; E2E dev login and fresh-install restore (`e2e-restore-01-library`) |
+| Sessions (PO decision) | Short-lived access token (15 min), rotating refresh token, 180-day absolute maximum, reuse detection with a 30 s grace window, revocation on logout and account deletion, cleanup sweep. The client retries a lost refresh reply with the same token and anchors expiry to the device clock | go `TestRefreshRotates`, `TestSessionExpiryIsAbsolute`, `TestRefreshReuse*`, `TestConcurrentRefreshRace`, `TestInvalidatedSuccessorAccessRevokesFamily`, `TestResolveSessionAndLogout`, `TestDeleteMeRevokesAllSessions`, `TestSessionSweepDeletesLongEndedSessions`; smoke "refresh rotates the pair", "logout revokes the session family"; iOS `AuthRefreshTests`, `AppSessionTests`; E2E `testSignOut` |
+| BIL-01 Quota | Ledger in seconds, shown as floored minutes; reserve before transcription, consume once, release on permanent failure; trial is 120 min for 30 days from first sign-in, once per Apple subject; local recording isn't blocked when quota runs out | go `TestReserveConsumeRelease`, `TestStartQuota`, `TestEntitlementInactiveOrExpired`, `TestPeriodChangeInFlight`, `TestTrialGrantConfigurableAndOncePerSubject`, `TestTrialAbuseDeleteAndResignIn`, `TestFinalizeOnceUnderLeaseRerun`; smoke "usage" (60 s consumed); E2E `e2e-20-settings`. StoreKit is out of scope (§4) |
+| PRV-01 Privacy and deletion | Every route checks the owner; signed links last 15 min and are issued only after the ownership check; deleting audio keeps notes and disables playback; audio expires 30 days after transcription and its text is kept; deleting a meeting cascades and cancels jobs (tombstones); account deletion revokes sessions and schedules a purge; logs carry no content | go `TestCrossAccountAllRoutes` (iterates the route table) + `*CrossAccount`, `TestSignedURLTTLAndOwnership`, `TestFilesSignedURLs`, `TestDeleteAudioKeepsNotes`, `TestRetentionSweep`, `TestDeleteDuringActiveJob`, `TestDeleteDuringGenerate`, `TestDeleteAccount`, `TestPurgeAccountRevokesApple`; iOS `MeetingDetailFeatureTests.playbackAvailability`; smoke "audio playback URL" (tampered signed URL 403), "delete meeting" (post-delete 404, id reuse 409); E2E delete meeting and delete account (`e2e-19`, `e2e-restore-06-account-deleted`) |
+| Idempotency / jobs | Idempotency keys on job creation; leases, fencing, backoff; duplicates and replays return the same job | go `TestStartIdempotency`, `TestEnqueueDuplicateAndLookups`, `TestFencingRejectsStaleAttempt`, `TestLeaseExpiryRerun`, `TestConcurrentComplete`, `TestResumeAndCompleteTwice`; smoke "complete (idempotent confirm)", "explicit transcription with the auto-start key (replay…)" |
+| Accessibility / localization | Dynamic Type (xl screenshots); VoiceOver for approximate times; status not shown by color alone; contrast ≥ 4.5:1; every key present in id and en | iOS `ContrastTests`, `LocalizationTests`, `RecordingFeatureTests.bannerMappingUsesIconAndTextNotColorAlone`, `FormattingTests`; shot `xl-*` |
+
+In the E2E run, the api log had 127 requests: 126 returned 2xx; one `GET /v1/usage` got 401 right after `DELETE /v1/me` (an expected in-flight request on the revoked session). The worker finished 3 `transcribe`, 2 `generate_notes` and 2 `generate_mom` jobs, all `succeeded`.
+
+## 2 Passed tests: mock providers only
+
+Run 2026-11-06 in the environment above. Counts come from this run, not copied from agent reports.
 
 | Suite | Command | Result |
 |---|---|---|
-| Backend vet + unit/integration | `cd backend && go vet ./... && go test ./... -count=1` | vet clean; 325 tests pass, 0 fail, 0 skip (26 packages) |
-| Backend smoke (real api + worker binaries, curl) | `backend/scripts/smoke.sh` | `SMOKE PASS` |
-| iOS unit | scheme `Phoebe` (`ios/README.md`) | 216 tests in 28 suites pass |
-| iOS E2E UI against the real backend | scheme `PhoebeScreenshots`, `-only-testing:PhoebeUITests/E2EFlowTests` | 3 pass, 1 skipped (live recording, see below) |
+| Backend vet | `cd backend && go vet ./...` | clean |
+| Backend unit + integration | `DATABASE_URL=postgres://phoebe:phoebe@localhost:55432/phoebe?sslmode=disable go test ./... -count=1` | 26 packages ok (3 have no test files: `cmd/api`, `cmd/worker`, `internal/apperr`). **278 top-level tests pass (417 including subtests), 0 fail, 2 skip.** The skips are live-provider tests (§3) |
+| Backend smoke (real `api` + `worker` binaries, curl, fake STT in chunk mode) | `backend/scripts/smoke.sh` | `SMOKE PASS`: 19 of 19 steps (dev login → refresh rotation → 2-chunk upload with auto transcription → replays → notes_ready → MoM → edit (stale 409) → review → md/docx/pdf/whatsapp + signed download → audio URL → usage incl. `ai_generations` → transcription only → generate notes → delete → logout revokes) |
+| iOS unit (scheme `Phoebe`) | `ios/README.md` "Unit tests" | **266 tests in 31 suites pass, 0 fail** (19.9 s) |
+| iOS E2E UI against the real api + worker (fake providers) | `ios/README.md` "End-to-end UI tests", fresh `tools/e2e_seed.sh` subjects | Not re-run after the final fix pass (its Swift changes are comment-only). Last run, earlier the same day: **5 executed: 4 pass, 1 skip, 0 fail** (407 s). Passed: `testImportToExport`, `testRestoreFromServer`, `testAISlotChoice`, `testSignOut`. Skipped: `testRecordShortMeeting` (needs `PHOEBE_E2E_RECORD=1` and host microphone access for Simulator) |
+| iOS screenshots (`ScreenshotTests` against `tools/mock_api.py`) | `ios/README.md` "Screenshots" | Not re-run in this pass. The committed light/dark/xl sets are from the integration pass on the same day |
 
-## Works end to end (simulator app + real api + worker)
+This pass wrote its E2E screenshots to a scratch directory and left the committed `ios/screenshots/e2e/` set unchanged. The new accessibility dumps showed the same copy (`~00:00`, "sekitar 0 detik", "Perlu ditinjau: 1", "Sisa 28", "Sisa 0. Slot berikutnya tersedia …").
 
-Evidence: `ios/screenshots/e2e/*.png` (with `.txt` accessibility dumps), the api request log (`http.request` lines with route and status), the worker job log, and Postgres rows checked after the run.
+## 3 Skipped live-provider checks (never run: no keys on this machine)
 
-| Flow | Evidence |
-|---|---|
-| Dev login, onboarding (welcome, privacy, sign-in, language) | `POST /v1/auth/dev` 200, then `GET /v1/config`, `/v1/folders`, `/v1/tags`, `/v1/meetings`, `/v1/usage` all 200 |
-| Import an m4a from Files, confirm sheet, local copy | `e2e-02-picker`, `e2e-03-import-confirm` |
-| Create meeting + upload + auto-started transcription | `POST /v1/meetings` 201, `POST /v1/meetings/{id}/uploads` 201, `PUT /v1/uploads/{id}` 200 (single chunk verifies and starts the job); worker `transcribe` then `generate_notes` succeeded |
-| Library row status refresh: Notes siap → MoM draft → Sudah ditinjau | `e2e-05-library-ready`, `e2e-16-library-reviewed` |
-| Detail: pipeline strip, timestamped transcript, AI notes | `e2e-06-detail-transcript`, `e2e-07-detail-notes`; `GET .../transcript`, `GET .../documents/{kind}` 200 |
-| Buat MoM | `POST .../documents/mom/generate` 202; worker `generate_mom` succeeded; `e2e-09-mom-ready` |
-| Edit MoM (title) | `PUT .../documents/mom` 201; editor shows `v2 · Diedit`; DB `current_revision_number = 2` |
-| Tandai sudah ditinjau | `PUT .../documents/mom/review` 200; `e2e-12-editor-reviewed` |
-| Export PDF + preview + iOS share sheet | `POST /v1/exports` 201, signed `GET /v1/files/{kind}/{id}` 200; preview shows the edited title; share sheet shows `rapatujie2e-diedit-undated-mom.pdf`, 18 KB; DB export row `is_draft = false` |
-| Personal notes (Catatan Anda) | `PUT .../documents/manual_notes` 201; AI notes then show "Berdasarkan versi lama" |
-| Rename via Edit info | `PATCH /v1/meetings/{id}` 200; DB `title = "RapatUjiE2E Final"`, `metadata_revision = 2` |
-| Delete meeting | `DELETE /v1/meetings/{id}` 202; row leaves the Library; worker `purge_meeting` succeeded |
-| Settings usage, plan and retention | `e2e-20-settings` (usage, trial plan, AI regeneration counter, retention rows) |
-| Fresh install on an existing account | Library restored from the server with the MoM draft chip (`e2e-restore-01-library`) |
-| Library search (filter + match) | `e2e-restore-02-search-empty`, search for "server" opens the meeting |
-| Playback of server audio (no local file) | `GET .../audio/url` 200 then `GET /v1/files/...` 200; player advances and highlights the active segment (`e2e-restore-04-playing`) |
-| Tags | `POST /v1/tags` 201 + `PATCH /v1/meetings/{id}` 200; `#klien` chip shown (`e2e-restore-05b-tagged`) |
-| Delete account | `DELETE /v1/me` 202; app returns to the welcome step; per-user store directory removed; `purge_account` job queued (runs after its delay) |
-| Sign out | returns to sign-in, app keeps running |
+None of the results above involve OpenAI or DeepSeek. Both live tests skip and print `SKIPPED …` unless the opt-in and the key are set, so `go test ./...` never calls a provider. They need `ffmpeg` but no `DATABASE_URL`. A run costs a few cents.
 
-The backend smoke additionally covers, through the real binaries: 2-chunk upload, `/complete` and explicit transcription replays returning the same job, stale MoM edit → 409 `revision_conflict`, md/docx/pdf/whatsapp downloads with file signatures, audio Range 206, tampered signed URL 403, usage 60 s consumed, post-delete 404s and meeting-id reuse 409.
+| Test | Validates | Env needed |
+|---|---|---|
+| `TestLiveOpenAISTT` (`backend/internal/ai/openai/live_test.go`) | Real `gpt-4o-mini-transcribe` call on the Indonesian fixture `testdata/speech_id.m4a`: non-empty segments, timing `chunk`, monotonic approximate bounds within the audio duration; logs segment and uncertain counts | `PHOEBE_LIVE=1`, `OPENAI_API_KEY`; optional `PHOEBE_LIVE_STT_MODEL` (`gpt-4o-transcribe`, `whisper-1`), `OPENAI_BASE_URL` |
+| `TestLiveDeepSeekNotesJSON` (`backend/internal/ai/openaicompat/live_test.go`) | Real `deepseek-flash` notes call, run as two subtests (thinking off and on): JSON matches the notes schema with no unknown fields, every item has text and known refs (`s1`–`s3`), `finish_reason=stop`, token counts > 0 | `PHOEBE_LIVE=1`, `DEEPSEEK_API_KEY`; optional `PHOEBE_LIVE_LLM_MODEL`, `DEEPSEEK_BASE_URL` |
 
-## Bugs found and fixed in this pass
+Commands:
 
-| Bug | Fix |
-|---|---|
-| Sign out and delete account crashed the app (SIGILL in SwiftData `@Query` update). `AppModel.signOut` dropped the last reference to the `ModelContainer` while the signed-in views were still running their final `@Query` update. | `ios/Phoebe/App/AppModel.swift`: the retired container is kept alive for 1 s after sign-out. |
-| Delete account then removed the store files while the views could still read them (`vnode unlinked while in use`). | `ios/Phoebe/Features/Settings/SettingsModel.swift`: waits up to 3 s for the container to be released before deleting `Application Support/<userID>/`. |
-| Tag picker: a newly created tag appeared twice in its `ForEach`, giving a SwiftUI duplicate-ID fault on save. | `ios/Phoebe/Features/MeetingDetail/MetadataSheet.swift`: `TagPickerSheet.all` skips created tags that are already in the store. |
+```sh
+cd backend
+OPENAI_API_KEY=sk-… DEEPSEEK_API_KEY=sk-… ./scripts/live-check.sh        # sets PHOEBE_LIVE=1 itself, runs both
+PHOEBE_LIVE=1 OPENAI_API_KEY=sk-… go test ./internal/ai/openai -run '^TestLiveOpenAISTT$' -count=1 -v
+PHOEBE_LIVE=1 DEEPSEEK_API_KEY=sk-… go test ./internal/ai/openaicompat -run '^TestLiveDeepSeekNotesJSON$' -count=1 -v
+```
 
-No HTTP contract mismatches or decoding errors were seen: every request in the E2E runs returned 2xx. App logs show no `com.kolarislabs.phoebe` errors.
+The live tests read `OPENAI_API_KEY` / `DEEPSEEK_API_KEY`. The api and worker read `STT_API_KEY` / `LLM_API_KEY` instead (§5).
 
-## Verified only by unit or integration tests
+Also outstanding against real providers:
+- **Full pipeline on real providers.** Run the api and worker with `STT_PROVIDER=openai STT_API_KEY=… LLM_PROVIDER=deepseek LLM_API_KEY=…` and `ffmpeg` on PATH, then repeat the E2E import flow with real speech. `smoke.sh` forces the fake providers, so it can't be used for this as-is.
+- **AI evaluation gate (PRD §9), not started.** It needs at least 30 consented meetings (Indonesian, English, mixed; quiet and noisy rooms; numbers, names, technical terms), two reviewers working from reference transcripts, and the same prompts and sources for each model. To pass: zero fabricated PIC, amount, deadline or decision, and at least 90% coverage of the important decisions and action items. Record actual cost, duration, structural validity and correction time. This set also calibrates `STT_UNCERTAIN_MEAN_LOGPROB` (−0.7 is a starting guess), the whisper-1 thresholds, `STT_DROP_SILENCE_RATIO` and the silence settings, and supplies the `*_PRICE_*` values.
 
-- **Recording engine** (`RecordingEngineTests`, `RecordingStateMachineTests`, `SegmentWriterTests`, `SegmentMergerTests`, `RecordingRecoveryTests`):
-  - segment rotation without restarting the engine; pause excludes paused time;
-  - interruption, route loss and media-services reset, never auto-resuming;
-  - storage preflight and low-storage stop;
-  - crash recovery keeps valid segments; merge sums within 1 s over 62 minutes.
-- **Background upload planning and resume**, checksum restart, upload error mapping (`UploadPlannerTests`, `UploadManagerFlowTests`, `ChecksumTests`).
-- **Offline outbox and sync**:
-  - queued creates, patches and edits;
-  - metadata, document and notes conflicts (`SyncEngineTests`, `EditorDraftTests`, `APIClientTests`).
-  - The E2E run never went offline.
-- **Import validation**: wrong type, corrupt file, too long, too big (`ImportValidatorTests`, `ImportCopierTests`).
-- **Backend acceptance scenarios**, all in `go test`:
-  - quota and entitlement: `TestStartQuota`, `TestEntitlementInactiveOrExpired`, `TestReserveConsumeRelease`;
-  - duplicate and retried jobs: `TestStartIdempotency`, `TestEnqueueDuplicateAndLookups`, `TestFinalizeOnceUnderLeaseRerun`;
-  - provider timeout and invalid output: `TestProviderTimeout`, `TestTranscribeTimeout`, `TestInvalidOutputRetried`;
-  - revision conflict: `TestRevisionConflictAndMutationReplay`;
-  - regenerate after edit: `TestRestoreAfterRegenerate`, `TestKeepMineProvenanceAndStaleness`;
-  - delete while a job is active: `TestDeleteDuringActiveJob`, `TestDeleteDuringGenerate`;
-  - cross-account access: `TestCrossAccountAllRoutes` and the per-domain `*CrossAccount` tests;
-  - prompt injection: `TestPromptInjectionContainment`;
-  - audio deletion and retention: `TestDeleteAudioKeepsNotes` and the sweep tests.
-- **Exports** in DOCX, MD and WhatsApp text: through smoke and `internal/export` tests. The UI exported PDF only.
-- **Localization**: all keys exist in both `en` and `id` (`LocalizationTests`). The E2E ran in Indonesian.
+## 4 Outstanding physical-device and credential validation
 
-## Needs a physical device or real accounts
+Nothing here has been run. Use a signed build on a real iPhone (§4.6 lists the signing prerequisites) and an API the device can reach.
 
-- **Live recording.** On this simulator, starting capture aborts inside `AURemoteIO::Initialize` (an RPC timeout from `AVAudioEngine.inputNode`, `CaptureEngine.swift:94`) because Simulator has no host microphone permission. `testRecordShortMeeting` is ready: run it with `PHOEBE_E2E_RECORD=1` on a Mac where Simulator has microphone access, or check recording on a device.
-- **60-minute lock-screen recording** with at least 30 segment rotations while locked.
-- **Incoming call interruption**, then resume.
-- **Force quit during recording and during merge**, then recovery.
-- **Background upload** across lock, suspend, force quit and a network switch. Record any delay in iOS background relaunches.
-- **WhatsApp share** of the text export and the files. The simulator share sheet shows only Copy, Markup, Print and Save to Files.
-- **Sign in with Apple**: needs a signing team, the capability and a real Apple ID. Server-side Apple revocation is not configured locally (`startup.apple_revocation_not_configured`).
-- **Real providers** (OpenAI STT, DeepSeek or Gemini LLM) and the 30-meeting AI evaluation gate (PRD §9). Every run so far used the fake providers.
-- **Performance targets** (60-minute audio to notes in 15 minutes; a 1,000-meeting library searched in 2 s), and testing on an iOS 17 device (no iOS 17 runtime is installed).
+1. **60-minute lock-screen recording (REC-01).** Start recording, lock the phone, leave it 60 min with normal room speech, unlock, stop. Pass: the merged file plays for the full ~60 min, the manifest shows ≥ 30 segment rotations while locked, active duration matches the timer within 1 s, and the upload verifies.
+2. **Incoming call (REC-02).** While recording, call the phone and answer; hang up after 30 s. Pass: the app shows "Paused by interruption", the segment before the call is closed and playable, the mic doesn't restart until the user taps Resume, and Resume continues into a new segment. Repeat with a declined call and with a Bluetooth headset that disconnects (route change).
+3. **Force quit and recovery (REC-01).** (a) Force quit from the app switcher during recording after 5 min. (b) Force quit during merge, right after Stop on a 30+ min recording. Relaunch each time. Pass: recovery is offered, the mic is not started, every closed segment is recovered, only the unfinished tail is missing, and the recovered meeting uploads once (no duplicate meeting).
+4. **Background upload (PRD §7).** Use a 60+ min recording on Wi-Fi with a throttled link (Network Link Conditioner, "3G"). Start the upload, then lock the phone; then background the app for 10 min (suspend); then switch Wi-Fi off so it moves to cellular mid-upload; then force quit and relaunch. Pass: the upload resumes from the server offset (`Upload-Offset`), the checksum verifies, there is exactly one meeting and one transcription job, and quota is reserved once. Record each delay in iOS background relaunches.
+5. **WhatsApp share (SHR-01).** With WhatsApp installed, share the WhatsApp text export, then the PDF, DOCX and MD exports, to a test chat. Then cancel a share. Pass: WhatsApp receives each format it supports, Indonesian characters are intact, cancelling changes nothing, and the app never claims the message was sent.
+6. **Real Sign in with Apple (ACC-01).** Prerequisites: an Apple Developer Program team; the Team ID in `ios/Config/Local.xcconfig` (`DEVELOPMENT_TEAM`, copied from `Local.example.xcconfig`), then `xcodegen generate`; App ID `com.kolarislabs.phoebe` with the Sign in with Apple capability (the entitlement is already in `project.yml`); backend `APPLE_BUNDLE_ID=com.kolarislabs.phoebe`; for deletion-time token revocation also `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (a `.p8` key with Sign in with Apple) and `TOKEN_ENC_KEY`; `PHOEBE_API_BASE_URL` set to an https API the device can reach. Procedure: first sign-in (name sent once, trial entitlement created), sign out, sign back in (same user, no second trial), revoke the app under Settings › Apple ID › Sign-In & Security (the next launch signs out), then delete the account (the Apple revoke endpoint is called, verified in the `purge_account` job log). Locally the startup still logs `startup.apple_revocation_not_configured`.
+7. **StoreKit 2: out of scope.** Subscriptions are needed only for paid launch (stage E) and pricing is undecided. Nothing to test; the UI says "Pembelian paket belum tersedia di versi pilot".
+8. **iOS 17 runtime (Compatibility).** The deployment target is 17.0, but no iOS 17 simulator runtime is installed and every test ran on 18.2. Install it with Xcode › Settings › Components › iOS 17.x, then run `xcodebuild … -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' test` (unit) and the E2E suite. Repeat on an iOS 17 device: recording, SwiftData store, and `AVAudioFile` finalize-on-deinit. Also run once on the newest iOS (26.x runtimes are installed but weren't used).
+9. **Performance targets (PRD §9).**
+   - Processing: 10 parallel 60-min uploads against real providers with `WORKER_CONCURRENCY=10`. Measure verified-upload → `notes_ready` per stage from `job.finished` `duration_ms`. Target: p95 ≤ 15 min.
+   - Library: seed 1,000 meetings for one user, then time Library search on the agreed test device. Target: ≤ 2 s.
+   - Autosave: type in the MoM editor, pause, and confirm the local save lands within 2 s. Instruments works, or watch the "Tersimpan di perangkat" state.
 
-## Observations (not changed)
+## 5 Product settings in effect
 
-- **Usage minutes don't add up.** Settings shows `0 dari 120 menit terpakai · 119 menit tersisa` after 20 s of audio. This follows the spec (`floor(seconds/60)` for each figure, `design-system/phoebe/pages/settings.md`), but used + left ≠ quota.
-- **Tag search hides the toolbar.** In the tag picker, an active search hides the sheet toolbar until the system "Batalkan" is tapped, so "Selesai" isn't reachable while typing. This is standard `.searchable` behaviour.
-- **Stray SwiftUI fault.** One `onChange(of: String) action tried to update multiple times per frame` fault was logged when opening a meeting detail. No visible effect.
-- **System picker flakiness.** The simulator's document picker service (`com.apple.DocumentManager.Service`) sometimes crashes while navigating to "On My iPhone". The E2E test reopens the picker and retries.
+Product-owner decisions as configured. All are backend env vars (`docs/backend.md` §16) unless marked iOS.
 
-## Open decisions
+| Setting | Value | Config key |
+|---|---|---|
+| Trial | 120 transcription minutes, valid 30 days from entitlement creation at first sign-in; once per Apple subject | `TRIAL_QUOTA_MINUTES=120`, `TRIAL_PERIOD_DAYS=30` |
+| AI generations | 30 per rolling 24 h per user (auto notes, notes generate/regenerate, MoM generate/regenerate). UI label "30 generasi AI per 24 jam" / "30 AI generations per 24 hours", numbers taken from the server | `AI_GENERATION_LIMIT=30`, `AI_GENERATION_WINDOW=24h` |
+| Sessions | Access token 15 min, rotating refresh, 180-day absolute maximum, 30 s grace for a lost refresh reply; ended sessions are deleted 7 days after they end | `ACCESS_TOKEN_TTL=15m`, `SESSION_MAX_AGE=4320h`, `REFRESH_REUSE_GRACE=30s`; the 7-day grace is the constant `auth.SessionGrace` |
+| Download links | 15 min, signed only after the ownership check | `SIGNED_URL_TTL=15m` |
+| Cloud audio retention | 30 days after successful transcription; manual delete anytime; expiry keeps transcript/notes/MoM and disables playback; untranscribed audio is kept until deleted | `AUDIO_RETENTION_DAYS=30` |
+| Export fonts | Noto Sans 2.015 primary, DejaVu Sans 2.37 fallback, both in the binary (`go:embed`). PDF embeds subsets; DOCX names the fonts but doesn't embed them (§6) | `backend/internal/export/fonts/` (no env) |
+| STT | OpenAI `gpt-4o-mini-transcribe`, chunk timing (approximate, ~30 s silence-aligned windows), logprob uncertainty plus silence detection | `STT_PROVIDER=openai` (default `fake`), `STT_API_KEY`, `STT_MODEL=gpt-4o-mini-transcribe`, `STT_CHUNK_TARGET_SECONDS=30` / `_MIN_=10` / `_MAX_=45`, `STT_SILENCE_NOISE_DB=-35`, `STT_SILENCE_MIN_DURATION=500ms`, `STT_UNCERTAIN_MEAN_LOGPROB=-0.7`, `STT_DROP_SILENCE_RATIO=0.8` (whisper-1 only) |
+| LLM | DeepSeek `deepseek-flash`, JSON output, thinking off for both tasks | `LLM_PROVIDER=deepseek` (default `fake`), `LLM_API_KEY`, `LLM_BASE_URL=https://api.deepseek.com`, `LLM_MODEL=deepseek-flash`, `LLM_THINKING_NOTES=false`, `LLM_THINKING_MOM=false` |
+| Provider prices | 0 (cost tracking off until set from the provider price list; DeepSeek rates are in `backend/README.md`) | `STT_PRICE_PER_MIN`, `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK`, `ALERT_DAILY_COST_USD` |
+| Apple | Bundle id `com.kolarislabs.phoebe`; Team ID still to be supplied | iOS `ios/Config/Local.xcconfig` `DEVELOPMENT_TEAM`; backend `APPLE_BUNDLE_ID`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `TOKEN_ENC_KEY` |
+| Pricing / plans | Undecided; none implemented | — |
 
-1. **Usage rounding:** keep floor-per-figure, or round used minutes up so used + left = quota?
-2. **Container release:** replace the 1 s container retention on sign-out with an explicit "views released" signal if SwiftUI ever makes this deterministic. The current approach is a timing margin, not a guarantee.
-3. **Real stack:** STT and LLM providers, models, region and retention must be chosen before the pilot (PRD §10). The smoke and E2E runs need repeating against them.
-4. **Purchases:** plans, pricing and trial length are still open. The UI says "Pembelian paket belum tersedia di versi pilot".
-5. **Device test plan:** the minimum devices and iOS versions for stage A.
-6. **Port conflicts:** compose binds the API to host port 8080, which is taken on some machines. Decide whether to make it configurable like `PHOEBE_PG_PORT`. The iOS Debug build expects `localhost:8080`.
+## 6 Known issues and open decisions
+
+Known issues (real, not fixed):
+1. **Blocked meeting on another device.** A meeting left `uploaded` by `transcription_blocked` or `quota_exceeded` has no "start transcription" control on a device without the local transcribe intent (fresh install, second device).
+2. **Library row for a blocked meeting** shows no "Menunggu slot AI" chip (`StatusChip` has no such case). Only Meeting Detail shows the state.
+3. **Retry forgets "Transkrip saja".** Retrying after a failed transcription asks for automatic notes again; with no slot left, the choice sheet reappears.
+4. **AI-slot choice sheet at XL text size** needs a scroll to reach its options; scrolling works.
+5. **Lost refresh reply plus a long outage signs the user out.** If the network stays down for the client's whole 20 s retry window after the server rotated the token, the next refresh lands outside the 30 s grace and the session ends. The fix was client-only. Removing this case needs a contract change (decision 2 below).
+6. **Clock skew right after sign-in.** Sign-in token pairs aren't anchored to the device clock, so a device with a wrong clock refreshes once after each sign-in.
+7. **Token rows grow until the session ends.** Rotated token rows of live sessions are kept, since they detect refresh replay: about one row per refresh until expiry plus 7 days. The 7-day value is a constant, not config.
+8. **Chunk timing may surface hallucinated text** from noisy, nearly silent windows. It is flagged for review rather than dropped (per the flag-never-discard rule). Thresholds are uncalibrated until §3's evaluation.
+9. **DOCX fonts aren't embedded.** The PO decision says both fonts are bundled and embedded so rendering matches everywhere. That holds for PDF. DOCX only names Noto Sans / DejaVu Sans, so viewers without them substitute: same text, layout can differ (`backend/internal/export/fonts/README.md`).
+10. **Usage minutes don't add up.** Each figure is floored separately (`floor(seconds/60)`, per `design-system/phoebe/pages/settings.md`), e.g. "0 dari 120 menit terpakai · 119 menit tersisa" after 20 s.
+11. **Sign-out keeps the retired SwiftData container alive for 1 s** to avoid a SwiftUI `@Query` crash. Account deletion waits up to 3 s before removing the store. These are timing margins, not guarantees.
+12. **Minor UI observations.** Tag-picker search hides the sheet toolbar (standard `.searchable`); one stray `onChange … multiple times per frame` fault appears when opening a detail; the simulator document picker sometimes crashes (the E2E test retries).
+13. **Local leftovers.** Scratch databases `phoebe_smoke_c3`, `phoebe_c2_schemacheck`, `phoebe_fixrun_schema` and `phoebe_fixrun_migrated` still exist (a safety hook blocks `DROP DATABASE` for agents; drop them by hand). The dev database `phoebe` (migration 0004) holds E2E and smoke test accounts.
+14. **Port 8080.** Compose binds the API to host 8080, which is taken on some machines, and the iOS Debug build hard-codes `localhost:8080`.
+15. **Sign-out while offline doesn't end the server session.** The app clears its local tokens, but the logout call fails, so the refresh token stays valid on the server until `SESSION_MAX_AGE` (180 days) unless the account is deleted.
+
+The fix pass skipped no review findings ("Rejected review findings: []"). Its deviations are items 5–7 above. The final fix pass also stopped treating ffmpeg exit 255 (ffmpeg caught SIGTERM/SIGINT, e.g. a systemd stop) as permanent `audio_unreadable`; it is now a retryable internal error.
+
+Open decisions:
+1. **DOCX font embedding.** Accept "named, not embedded" for DOCX, or embed fonts despite uneven viewer support (Word/Pages/Google Docs/LibreOffice).
+2. **Refresh grace contract.** Keep the 30 s window, or accept an old refresh token whenever its successor is wholly unused, regardless of age (removes issue 5).
+3. **Usage rounding.** Keep floor-per-figure, or round used minutes up so used + left = quota.
+4. **Before the external pilot (PRD §10):** confirm providers and models after the §3 evaluation; set prices; choose the processing region; check provider data-retention and training terms; decide on backup retention.
+5. **Device test plan:** minimum devices and iOS versions for stage A (needs the iOS 17 runtime/device, §4.8).
+6. **Pricing, plans and StoreKit:** undecided, needed before paid launch (stage E).
+7. **Export retention:** export objects are kept until meeting or account purge; there is no separate expiry.

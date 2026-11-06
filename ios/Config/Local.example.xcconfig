@@ -1,0 +1,3 @@
+// Copy to Local.xcconfig (gitignored) and set your Apple Developer Team ID
+// (developer.apple.com → Membership details, 10 characters). Then run `xcodegen generate`.
+DEVELOPMENT_TEAM = ABCDE12345

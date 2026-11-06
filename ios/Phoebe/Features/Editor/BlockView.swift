@@ -115,8 +115,8 @@ struct EditorRefActions: ViewModifier {
         content.accessibilityActions {
             if isPlayable {
                 ForEach(Array(sources.enumerated()), id: \.offset) { _, ref in
-                    if case .transcript(_, let startMs, _) = ref, model.isVerified(ref) {
-                        Button { model.play(ref) } label: { Text(L("ref.playAt", Formatting.timestamp(ms: startMs))) }
+                    if case .transcript(_, let startMs, _, let approximate) = ref, model.isVerified(ref) {
+                        Button { model.play(ref) } label: { Text(L("ref.playAt", Formatting.spokenTimestamp(ms: startMs, approximate: approximate))) }
                     }
                 }
             }

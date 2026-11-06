@@ -3,10 +3,12 @@ package documents
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"phoebe/internal/ai"
@@ -55,8 +57,14 @@ var seedSegments = []segment{
 	{ID: "s3", StartMS: 30000, EndMS: 34000, Text: "Budi akan menyiapkan laporan minggu depan."},
 }
 
-// seedMeeting creates a meeting in notes_ready with transcript revision 1; returns (meeting, transcript rev id).
+// seedMeeting creates a meeting in notes_ready with transcript revision 1 (timing "segment");
+// returns (meeting, transcript rev id).
 func (e *denv) seedMeeting(t *testing.T, uid string, segs []segment) (string, string) {
+	t.Helper()
+	return e.seedMeetingTiming(t, uid, segs, "segment")
+}
+
+func (e *denv) seedMeetingTiming(t *testing.T, uid string, segs []segment, timing string) (string, string) {
 	t.Helper()
 	mid := ids.New()
 	if _, err := e.pool.Exec(bg, `INSERT INTO meetings (id, user_id, title, timezone, started_at, participants, pipeline_state)
@@ -72,8 +80,8 @@ func (e *denv) seedMeeting(t *testing.T, uid string, segs []segment) (string, st
 	}
 	raw, _ := json.Marshal(segs)
 	var trID string
-	if err := e.pool.QueryRow(bg, `INSERT INTO transcript_revisions (meeting_id, revision_number, kind, language, provider, model, segments, job_id)
-		VALUES ($1, 1, 'original', 'id', 'fake', 'fake-stt', $2, $3) RETURNING id`, mid, raw, jobID).Scan(&trID); err != nil {
+	if err := e.pool.QueryRow(bg, `INSERT INTO transcript_revisions (meeting_id, revision_number, kind, language, provider, model, segments, job_id, timing)
+		VALUES ($1, 1, 'original', 'id', 'fake', 'fake-stt', $2, $3, $4) RETURNING id`, mid, raw, jobID, timing).Scan(&trID); err != nil {
 		t.Fatal(err)
 	}
 	return mid, trID
@@ -85,8 +93,8 @@ func (e *denv) correct(t *testing.T, mid string) string {
 	var id string
 	if err := e.pool.QueryRow(bg, `
 		INSERT INTO transcript_revisions (meeting_id, revision_number, kind, parent_revision_id, language, provider, model,
-		                                  segments, mutation_id, mutation_fingerprint)
-		SELECT meeting_id, revision_number + 1, 'correction', id, language, provider, model, segments, gen_random_uuid(), repeat('b', 64)
+		                                  segments, mutation_id, mutation_fingerprint, timing)
+		SELECT meeting_id, revision_number + 1, 'correction', id, language, provider, model, segments, gen_random_uuid(), repeat('b', 64), timing
 		FROM transcript_revisions WHERE meeting_id = $1 ORDER BY revision_number DESC LIMIT 1
 		RETURNING id`, mid).Scan(&id); err != nil {
 		t.Fatal(err)
@@ -229,6 +237,25 @@ func putBody(expected, base int, mutation string, content json.RawMessage) strin
 }
 
 func code(err error) apperr.Code { return apperr.CodeOf(err) }
+
+func (e *denv) slot(t *testing.T, jobID string) string {
+	t.Helper()
+	var st string
+	err := e.pool.QueryRow(bg, `SELECT status FROM ai_generation_slots WHERE job_id = $1`, jobID).Scan(&st)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		t.Fatal(err)
+	}
+	return st
+}
+
+func (e *denv) remaining(t *testing.T, uid string) int {
+	t.Helper()
+	u, err := e.svc.usage.Get(bg, uid)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return u.AIGenerations.Remaining
+}
 
 func details(err error) map[string]any {
 	if ae, ok := err.(*apperr.Error); ok {

@@ -38,6 +38,16 @@ func TestSelectByConfig(t *testing.T) {
 		t.Errorf("llm name %s %s", p, m)
 	}
 
+	if _, err := STT(&config.Config{STTProvider: "openai", STTModel: "gpt-5-transcribe"}); err == nil {
+		t.Error("model outside the capability table accepted")
+	}
+	cfg.LLMProvider, cfg.LLMModel, cfg.LLMThinkingMoM = "deepseek", "deepseek-flash", true
+	if l, err = LLM(cfg); err != nil {
+		t.Fatal(err)
+	}
+	if p, m := l.Name(); p != "deepseek" || m != "deepseek-flash" {
+		t.Errorf("deepseek name %s %s", p, m)
+	}
 	if _, err := STT(&config.Config{STTProvider: "whisperx"}); err == nil {
 		t.Error("unknown stt accepted")
 	}

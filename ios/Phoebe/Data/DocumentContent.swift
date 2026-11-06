@@ -355,12 +355,13 @@ struct ActionItem: Codable, Equatable, Identifiable, Sendable {
 }
 
 enum SourceRef: Equatable, Hashable, Sendable {
-    case transcript(segmentId: String, startMs: Int, endMs: Int)
+    // `approximate` is set by the server from the transcript revision's timing; the client only round-trips it.
+    case transcript(segmentId: String, startMs: Int, endMs: Int, approximate: Bool = false)
     case userNotes(noteId: String)
 }
 
 extension SourceRef: Codable {
-    enum CodingKeys: String, CodingKey { case type, segmentId, startMs, endMs, noteId }
+    enum CodingKeys: String, CodingKey { case type, segmentId, startMs, endMs, approximate, noteId }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
@@ -369,7 +370,8 @@ extension SourceRef: Codable {
             self = .transcript(
                 segmentId: try c.decode(String.self, forKey: .segmentId),
                 startMs: try c.decode(Int.self, forKey: .startMs),
-                endMs: try c.decode(Int.self, forKey: .endMs)
+                endMs: try c.decode(Int.self, forKey: .endMs),
+                approximate: try c.decodeIfPresent(Bool.self, forKey: .approximate) ?? false
             )
         case "user_notes":
             self = .userNotes(noteId: try c.decode(String.self, forKey: .noteId))
@@ -381,11 +383,12 @@ extension SourceRef: Codable {
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case let .transcript(segmentId, startMs, endMs):
+        case let .transcript(segmentId, startMs, endMs, approximate):
             try c.encode("transcript", forKey: .type)
             try c.encode(segmentId, forKey: .segmentId)
             try c.encode(startMs, forKey: .startMs)
             try c.encode(endMs, forKey: .endMs)
+            try c.encode(approximate, forKey: .approximate)
         case let .userNotes(noteId):
             try c.encode("user_notes", forKey: .type)
             try c.encode(noteId, forKey: .noteId)

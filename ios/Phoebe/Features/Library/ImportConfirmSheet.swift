@@ -32,8 +32,13 @@ struct ImportConfirmSheet: View {
                         ForEach(TranscriptionLanguage.allCases, id: \.self) { Text(LanguageNames.transcription($0)).tag($0) }
                     }
                 } footer: {
-                    if app.serverConfig == nil {
-                        Text(L("import.confirm.waitConfig", table: .library))
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        if app.serverConfig == nil {
+                            Text(L("import.confirm.waitConfig", table: .library))
+                        }
+                        if AIAllowance.needsChoice(usage: app.usage, notes: .auto) {
+                            Text(L("import.confirm.aiSlot", table: .library))
+                        }
                     }
                 }
             }

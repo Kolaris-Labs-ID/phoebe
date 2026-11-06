@@ -20,6 +20,16 @@ struct FormattingTests {
         #expect(Formatting.timestamp(ms: 724_000) == "12:04")
     }
 
+    @Test func approximateTimesUseTildeAndSpokenAbout() {
+        #expect(Formatting.timestamp(ms: 30_000, approximate: true) == "~00:30")
+        #expect(Formatting.timestamp(ms: 3_725_000, approximate: true) == "~1:02:05")
+        #expect(Formatting.reference(ms: 724_000, approximate: true) == "[~12:04]")
+        #expect(Formatting.reference(ms: 724_000, approximate: false) == "[12:04]")
+        #expect(Formatting.spokenTimestamp(ms: 724_000, approximate: true, locale: Locale(identifier: "id_ID"), localization: "id") == "sekitar 12 menit, 4 detik")
+        #expect(Formatting.spokenTimestamp(ms: 724_000, approximate: true, locale: Locale(identifier: "en_US"), localization: "en") == "about 12 minutes, 4 seconds")
+        #expect(Formatting.spokenTimestamp(ms: 724_000, approximate: false, locale: Locale(identifier: "en_US"), localization: "en") == "12 minutes, 4 seconds")
+    }
+
     @Test func spokenDurationIndonesianAndEnglish() {
         #expect(Formatting.spokenDuration(ms: 724_000, locale: Locale(identifier: "id_ID")) == "12 menit, 4 detik")
         #expect(Formatting.spokenDuration(ms: 724_000, locale: Locale(identifier: "en_US")) == "12 minutes, 4 seconds")

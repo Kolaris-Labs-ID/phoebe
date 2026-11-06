@@ -9,6 +9,8 @@ enum APIError: Error, Equatable, Sendable {
     case invalidJSON
     case missingIdempotencyKey
     case unauthenticated
+    // Handled inside APIClient (refresh, retry once); only UploadManager sees it, from background chunk results.
+    case accessTokenExpired
     case quotaExceeded(requiredSeconds: Int?, remainingSeconds: Int?)
     case entitlementInactive(periodEnd: Date?)
     case invalidSignature
@@ -42,7 +44,7 @@ enum APIError: Error, Equatable, Sendable {
     case audioCorrupt
     case audioEmpty
     case audioTooLong(durationMs: Int?, maxDurationMs: Int?)
-    case rateLimited(retryAfterSeconds: Int?)
+    case aiGenerationLimit(nextSlotAt: Date?)
     case `internal`(requestId: String?)
     case unavailable
     case server(status: Int, code: String?)
@@ -67,6 +69,7 @@ enum APIError: Error, Equatable, Sendable {
         case .invalidJSON: "invalid_json"
         case .missingIdempotencyKey: "missing_idempotency_key"
         case .unauthenticated: "unauthenticated"
+        case .accessTokenExpired: "access_token_expired"
         case .quotaExceeded: "quota_exceeded"
         case .entitlementInactive: "entitlement_inactive"
         case .invalidSignature: "invalid_signature"
@@ -100,7 +103,7 @@ enum APIError: Error, Equatable, Sendable {
         case .audioCorrupt: "audio_corrupt"
         case .audioEmpty: "audio_empty"
         case .audioTooLong: "audio_too_long"
-        case .rateLimited: "rate_limited"
+        case .aiGenerationLimit: "ai_generation_limit"
         case .internal: "internal"
         case .unavailable: "unavailable"
         case .server(_, let code): code ?? "server"
@@ -121,7 +124,7 @@ enum APIError: Error, Equatable, Sendable {
         }
     }
 
-    static func from(status: Int, data: Data, retryAfter: String? = nil) -> APIError {
+    static func from(status: Int, data: Data) -> APIError {
         let root = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
         let error = root?["error"] as? [String: Any]
         let code = error?["code"] as? String
@@ -133,7 +136,9 @@ enum APIError: Error, Equatable, Sendable {
         switch code {
         case "invalid_json": return .invalidJSON
         case "missing_idempotency_key": return .missingIdempotencyKey
-        case "unauthenticated": return .unauthenticated
+        // Callers only need "stop and sign out"; folding these keeps every existing .unauthenticated branch correct.
+        case "unauthenticated", "session_revoked", "session_expired": return .unauthenticated
+        case "access_token_expired": return .accessTokenExpired
         case "quota_exceeded": return .quotaExceeded(requiredSeconds: int("required_seconds"), remainingSeconds: int("remaining_seconds"))
         case "entitlement_inactive": return .entitlementInactive(periodEnd: (d["period_end"] as? String).flatMap(APICoding.parseDate))
         case "invalid_signature": return .invalidSignature
@@ -172,7 +177,7 @@ enum APIError: Error, Equatable, Sendable {
         case "audio_corrupt": return .audioCorrupt
         case "audio_empty": return .audioEmpty
         case "audio_too_long": return .audioTooLong(durationMs: int("duration_ms"), maxDurationMs: int("max_duration_ms"))
-        case "rate_limited": return .rateLimited(retryAfterSeconds: int("retry_after_seconds") ?? retryAfter.flatMap { Int($0) })
+        case "ai_generation_limit": return .aiGenerationLimit(nextSlotAt: (d["next_slot_at"] as? String).flatMap(APICoding.parseDate))
         case "internal": return .internal(requestId: requestID)
         case "unavailable": return .unavailable
         default:

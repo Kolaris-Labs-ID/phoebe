@@ -37,8 +37,9 @@ type Span struct{ StartMS, EndMS int64 }
 // Pins are the sources pinned by the base revision; refs are validated against them.
 // A nil map means that source is not pinned, so any ref of that type is invalid.
 type Pins struct {
-	Segments map[string]Span
-	NoteIDs  map[string]bool
+	Segments    map[string]Span
+	NoteIDs     map[string]bool
+	Approximate bool
 }
 
 // ValidateContent strictly validates client content (api.md §3) and returns it
@@ -415,7 +416,11 @@ func (v *validator) provenance(m map[string]any, p string) (string, bool, []Sour
 		case RefTranscript:
 			sid, _ := rm["segment_id"].(string)
 			span, ok := v.pins.Segments[sid]
+			ax, hasApprox := rm["approximate"]
+			_, isBool := ax.(bool)
 			switch {
+			case hasApprox && !isBool:
+				v.fail(rp+"/approximate", apperr.ReasonInvalid)
 			case v.pins.Segments == nil:
 				v.fail(rp, apperr.ReasonNotFound)
 			case sid == "":
@@ -423,7 +428,7 @@ func (v *validator) provenance(m map[string]any, p string) (string, bool, []Sour
 			case !ok:
 				v.fail(rp+"/segment_id", apperr.ReasonNotFound)
 			}
-			refs = append(refs, SourceRef{Type: RefTranscript, SegmentID: sid, StartMS: span.StartMS, EndMS: span.EndMS})
+			refs = append(refs, SourceRef{Type: RefTranscript, SegmentID: sid, StartMS: span.StartMS, EndMS: span.EndMS, Approximate: v.pins.Approximate})
 		case RefUserNotes:
 			nid, _ := rm["note_id"].(string)
 			switch {

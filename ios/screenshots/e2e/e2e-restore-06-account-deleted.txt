@@ -1,51 +1,51 @@
-Optional(Attributes: Application, 0x104714550, pid: 80674, label: 'Phoebe'
+Optional(Attributes: Application, 0x1074432e0, pid: 38768, label: 'Phoebe'
 Element subtree:
- →Application, 0x104714550, pid: 80674, label: 'Phoebe'
-    Window (Main), 0x104706cf0, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x104715d90, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x104712250, {{0.0, 0.0}, {393.0, 852.0}}
-          Other, 0x10472dc40, {{0.0, 0.0}, {393.0, 852.0}}
-            Other, 0x10471a2e0, {{0.0, 0.0}, {393.0, 852.0}}
-              Other, 0x104713740, {{0.0, 0.0}, {393.0, 852.0}}
-                NavigationBar, 0x1047141d0, {{0.0, 53.7}, {393.0, 44.0}}, identifier: '_TtGC7SwiftUI32NavigationStackHosting'
-                  Other, 0x10471c530, {{319.7, 53.7}, {57.3, 44.0}}, label: 'Lewati'
-                    Other, 0x1043191a0, {{319.7, 53.7}, {57.3, 44.0}}
-                      Button, 0x104314e90, {{319.7, 53.7}, {57.3, 44.0}}, label: 'Lewati'
-                Other, 0x104324090, {{0.0, 0.0}, {393.0, 852.0}}
-                  Other, 0x104321c60, {{0.0, 0.0}, {393.0, 852.0}}
-                    Other, 0x104324350, {{0.0, 0.0}, {393.0, 852.0}}
-                      Other, 0x104324470, {{0.0, 0.0}, {393.0, 852.0}}
-                        ScrollView, 0x104324590, {{0.0, 0.0}, {393.0, 852.0}}
-                          Other, 0x1043246b0, {{0.0, 97.7}, {393.0, 571.0}}
-                            StaticText, 0x106a132f0, {{59.7, 133.7}, {184.3, 19.3}}, label: 'Akun Anda telah dihapus.'
-                            StaticText, 0x106a18380, {{31.0, 279.0}, {331.0, 122.7}}, label: 'Rekam meeting. Dapatkan MoM yang bisa diedit.'
-                            StaticText, 0x106a14e70, {{26.0, 425.7}, {334.3, 82.3}}, label: 'Rekam di iPhone, Untuk meeting tatap muka atau suara dari perangkat lain. Panggilan di iPhone ini tidak ikut terekam.'
-                              Image, 0x106a0fe70, {{26.0, 426.7}, {12.0, 18.0}}, identifier: 'mic', label: 'Mikrofon'
-                              StaticText, 0x106a13d20, {{60.0, 425.7}, {131.3, 20.3}}, label: 'Rekam di iPhone'
-                              StaticText, 0x106a0b2a0, {{60.0, 450.0}, {300.3, 58.0}}, label: 'Untuk meeting tatap muka atau suara dari perangkat lain. Panggilan di iPhone ini tidak ikut terekam.'
-                            StaticText, 0x106a120d0, {{23.7, 524.0}, {306.0, 42.3}}, label: 'Transkrip bertimestamp, Ketuk kalimat untuk memutar audionya.'
-                              Image, 0x104409830, {{23.7, 525.0}, {17.0, 14.7}}, identifier: 'text.quote', label: 'Lirik'
-                              StaticText, 0x104024d60, {{60.0, 524.0}, {191.0, 20.3}}, label: 'Transkrip bertimestamp'
-                              StaticText, 0x106a14430, {{60.0, 548.3}, {269.7, 18.0}}, label: 'Ketuk kalimat untuk memutar audionya.'
-                            StaticText, 0x112e16a90, {{25.0, 582.3}, {317.7, 62.3}}, label: 'MoM siap dibagikan, Edit, tandai sudah ditinjau, lalu ekspor ke PDF, Word, Markdown, atau WhatsApp.'
-                              Image, 0x112e0d000, {{25.0, 583.3}, {14.0, 18.0}}, identifier: 'doc.text', label: 'Dokumen Teks Biasa'
-                              StaticText, 0x106928710, {{60.0, 582.3}, {158.0, 20.3}}, label: 'MoM siap dibagikan'
-                              StaticText, 0x106927fc0, {{60.0, 606.7}, {282.7, 38.0}}, label: 'Edit, tandai sudah ditinjau, lalu ekspor ke PDF, Word, Markdown, atau WhatsApp.'
-                          Other, 0x11280b420, {{360.0, 97.7}, {30.0, 600.7}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
-                            Other, 0x10682b9e0, {{387.0, 130.3}, {3.0, 565.0}}
-                          Other, 0x10682bb00, {{360.0, 97.7}, {30.0, 600.7}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
-                            Other, 0x10682bc20, {{387.0, 130.3}, {3.0, 565.0}}
-                        Button, 0x10682bd40, {{16.0, 718.3}, {361.0, 64.0}}, label: 'Lanjut'
-                        StaticText, 0x10682be60, {{173.2, 794.3}, {46.7, 15.7}}, label: 'Langkah 1 dari 3'
-    Window, 0x10682bf80, {{0.0, 0.0}, {393.0, 852.0}}
-      Other, 0x10682c0a0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x10682c1c0, {{0.0, 0.0}, {393.0, 852.0}}
-        Other, 0x10682c2e0, {{0.0, 852.0}, {393.0, 233.0}}
+ →Application, 0x1074432e0, pid: 38768, label: 'Phoebe'
+    Window (Main), 0x107443400, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x1074437c0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x1074438e0, {{0.0, 0.0}, {440.0, 956.0}}
+          Other, 0x107443520, {{0.0, 0.0}, {440.0, 956.0}}
+            Other, 0x107443640, {{0.0, 0.0}, {440.0, 956.0}}
+              Other, 0x107443a00, {{0.0, 0.0}, {440.0, 956.0}}
+                NavigationBar, 0x107443b20, {{0.0, 56.3}, {440.0, 44.0}}, identifier: '_TtGC7SwiftUI32NavigationStackHosting'
+                  Other, 0x107443c40, {{362.7, 56.3}, {57.3, 44.0}}, label: 'Lewati'
+                    Other, 0x107443d60, {{362.7, 56.3}, {57.3, 44.0}}
+                      Button, 0x107443e80, {{362.7, 56.3}, {57.3, 44.0}}, label: 'Lewati'
+                Other, 0x107443fa0, {{0.0, 0.0}, {440.0, 956.0}}
+                  Other, 0x1074440c0, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x1074441e0, {{0.0, 0.0}, {440.0, 956.0}}
+                      Other, 0x107444300, {{0.0, 0.0}, {440.0, 956.0}}
+                        ScrollView, 0x107444420, {{0.0, 0.0}, {440.0, 956.0}}
+                          Other, 0x107444540, {{0.0, 100.3}, {440.0, 571.0}}
+                            StaticText, 0x107444660, {{59.7, 136.3}, {184.3, 19.3}}, label: 'Akun Anda telah dihapus.'
+                            StaticText, 0x107444780, {{17.8, 281.7}, {404.3, 122.7}}, label: 'Rekam meeting. Dapatkan MoM yang bisa diedit.'
+                            StaticText, 0x1074448a0, {{26.0, 428.3}, {363.3, 82.3}}, label: 'Rekam di iPhone, Untuk meeting tatap muka atau suara dari perangkat lain. Panggilan di iPhone ini tidak ikut terekam.'
+                              Image, 0x1074449c0, {{26.0, 429.3}, {12.0, 18.0}}, identifier: 'mic', label: 'Mikrofon'
+                              StaticText, 0x10770e1a0, {{60.0, 428.3}, {131.3, 20.3}}, label: 'Rekam di iPhone'
+                              StaticText, 0x1077226c0, {{60.0, 452.7}, {329.3, 58.0}}, label: 'Untuk meeting tatap muka atau suara dari perangkat lain. Panggilan di iPhone ini tidak ikut terekam.'
+                            StaticText, 0x10770ba20, {{23.7, 526.7}, {306.0, 42.3}}, label: 'Transkrip bertimestamp, Ketuk kalimat untuk memutar audionya.'
+                              Image, 0x10770d720, {{23.7, 527.7}, {17.0, 14.7}}, identifier: 'text.quote', label: 'Lirik'
+                              StaticText, 0x107714ec0, {{60.0, 526.7}, {191.0, 20.3}}, label: 'Transkrip bertimestamp'
+                              StaticText, 0x107714fe0, {{60.0, 551.0}, {269.7, 18.0}}, label: 'Ketuk kalimat untuk memutar audionya.'
+                            StaticText, 0x107715370, {{25.0, 585.0}, {353.0, 62.3}}, label: 'MoM siap dibagikan, Edit, tandai sudah ditinjau, lalu ekspor ke PDF, Word, Markdown, atau WhatsApp.'
+                              Image, 0x107715490, {{25.0, 586.0}, {14.0, 18.0}}, identifier: 'doc.text', label: 'Dokumen Teks Biasa'
+                              StaticText, 0x1077155b0, {{60.0, 585.0}, {158.0, 20.3}}, label: 'MoM siap dibagikan'
+                              StaticText, 0x1077156d0, {{60.0, 609.3}, {318.0, 38.0}}, label: 'Edit, tandai sudah ditinjau, lalu ekspor ke PDF, Word, Markdown, atau WhatsApp.'
+                          Other, 0x1077157f0, {{407.0, 100.3}, {30.0, 702.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x107715910, {{434.0, 234.3}, {3.0, 565.0}}
+                          Other, 0x107715a30, {{407.0, 100.3}, {30.0, 702.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x107715b50, {{434.0, 234.3}, {3.0, 565.0}}
+                        Button, 0x107715c70, {{16.0, 822.3}, {408.0, 64.0}}, label: 'Lanjut'
+                        StaticText, 0x107715d90, {{196.7, 898.3}, {46.7, 15.7}}, label: 'Langkah 1 dari 3'
+    Window, 0x107715eb0, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x107715fd0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x1077160f0, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107716210, {{0.0, 956.0}, {440.0, 243.0}}
 Path to element:
- →Application, 0x104714550, pid: 80674, label: 'Phoebe'
+ →Application, 0x1074432e0, pid: 38768, label: 'Phoebe'
 Query chain:
  →Find: Target Application 'com.kolarislabs.phoebe'
   Output: {
-    Application, 0x10451bce0, pid: 80674, label: 'Phoebe'
+    Application, 0x10a720c20, pid: 38768, label: 'Phoebe'
   }
 )

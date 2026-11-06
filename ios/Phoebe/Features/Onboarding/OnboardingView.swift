@@ -252,8 +252,10 @@ struct OnboardingSignInStep: View {
 
     @ViewBuilder private var banners: some View {
         switch app.signOutReason {
-        case .revoked?, .unauthenticated?:
+        case .revoked?:
             Banner(tone: .info, systemImage: "info.circle", message: L("onb.signin.revoked", table: .onboarding))
+        case .unauthenticated?:
+            Banner(tone: .info, systemImage: "info.circle", message: L("session.ended", table: .common))
         case .accountDeleted?:
             Banner(tone: .success, systemImage: "checkmark.circle", message: L("settings.delete.done", table: .settings))
         default:

@@ -19,19 +19,19 @@ func TestSTTDeterministicSegments(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if res.Language != "id" || res.AudioMS != 100_000 || len(res.Segments) != 7 {
+	if res.Language != "id" || res.AudioMS != 100_000 || len(res.Segments) != 7 || res.Timing != ai.TimingChunk {
 		t.Fatalf("result %+v", res)
 	}
 	for k, s := range res.Segments {
-		if s.StartSec != float64(k*15) {
-			t.Errorf("seg %d start %v", k, s.StartSec)
+		if s.StartMS != int64(k*15000) {
+			t.Errorf("seg %d start %v", k, s.StartMS)
 		}
-		if s.NoSpeechProb != 0 || s.AvgLogprob != 0 || s.CompressionRatio != 0 || s.Text == "" {
+		if s.Uncertain || s.UncertainReason != "" || s.Text == "" {
 			t.Errorf("seg %d %+v", k, s)
 		}
 	}
-	if last := res.Segments[6]; last.EndSec != 100 {
-		t.Errorf("last end %v", last.EndSec)
+	if last := res.Segments[6]; last.EndMS != 100_000 {
+		t.Errorf("last end %v", last.EndMS)
 	}
 	texts := ""
 	for _, s := range res.Segments {
@@ -59,15 +59,45 @@ func TestSTTDeterministicSegments(t *testing.T) {
 
 func TestSTTScripted(t *testing.T) {
 	boom := ai.NewError(jobs.CatProviderUnavailable, true, 503, "")
-	f := &STT{Errs: []error{boom}, Results: []ai.STTResult{{}, {Segments: []ai.RawSegment{{Text: "x", NoSpeechProb: 0.9}}}}}
+	uncertain := ai.Segment{Text: "x", Uncertain: true, UncertainReason: ai.UncertainLowConfidence}
+	f := &STT{Errs: []error{boom}, Results: []ai.STTResult{{}, {Segments: []ai.Segment{uncertain}}, {Timing: ai.TimingSegment}}}
 	if _, err := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 30000}); !errors.Is(err, boom) {
 		t.Errorf("call 0: %v", err)
 	}
-	if r, err := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 30000}); err != nil || len(r.Segments) != 1 || r.Segments[0].NoSpeechProb != 0.9 {
+	if r, err := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 30000}); err != nil || len(r.Segments) != 1 ||
+		r.Segments[0] != uncertain || r.Timing != ai.TimingChunk {
 		t.Errorf("call 1: %+v %v", r, err)
 	}
+	if r, _ := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 30000}); r.Timing != ai.TimingSegment {
+		t.Errorf("call 2 scripted timing: %+v", r)
+	}
 	if r, _ := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 30000}); len(r.Segments) != 2 {
-		t.Errorf("call 2 default: %+v", r)
+		t.Errorf("call 3 default: %+v", r)
+	}
+}
+
+func TestSTTTimingUncertainSilent(t *testing.T) {
+	f := &STT{Timing: ai.TimingSegment, Uncertain: []int{1, 3}, Silent: []int{2}}
+	r, err := f.Transcribe(context.Background(), ai.STTInput{DurationMS: 60_000, Language: "id"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if r.Timing != ai.TimingSegment || len(r.Segments) != 3 {
+		t.Fatalf("result %+v", r)
+	}
+	want := []struct {
+		start     int64
+		uncertain bool
+	}{{0, false}, {15000, true}, {45000, true}}
+	for k, w := range want {
+		s := r.Segments[k]
+		reason := ""
+		if w.uncertain {
+			reason = ai.UncertainLowConfidence
+		}
+		if s.StartMS != w.start || s.EndMS != w.start+15000 || s.Uncertain != w.uncertain || s.UncertainReason != reason {
+			t.Errorf("seg %d %+v", k, s)
+		}
 	}
 }
 

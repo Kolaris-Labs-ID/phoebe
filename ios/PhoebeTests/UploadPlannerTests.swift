@@ -70,6 +70,10 @@ struct UploadPlannerTests {
         #expect(P.next(after: .unauthenticated, stage: .putChunk, checksumRestarts: 0) == .stop)
     }
 
+    @Test func expiredBearerOnAChunkReschedulesThroughTheSessionGet() {
+        #expect(P.next(after: .accessTokenExpired, stage: .putChunk, checksumRestarts: 0) == .refreshSession)
+    }
+
     @Test func sessionStatusBranches() {
         let id = UUID(), meeting = UUID()
         func s(_ status: String, received: Int = 0, failure: String? = nil) -> UploadSessionDTO {
@@ -143,6 +147,43 @@ struct UploadManagerFlowTests {
         #expect(s.h.server.requests(.post, "/transcription").isEmpty)
         #expect(s.meeting.localPhase == LocalPhase.none)
         #expect(s.meeting.activeJobTypes == ["transcribe"])
+    }
+
+    @Test func chunkAccessTokenExpiredRefreshesAndReschedulesTheChunk() async throws {
+        let s = try await setup()
+        s.h.app.auth.saveTokens(.pair("at_1", expiresIn: 900))
+        defer { s.h.app.auth.clearSession() }
+        s.h.server.enqueue("POST", s.createPath, .json(201, Fx.uploadEnvelope(s.session())))
+        s.h.server.enqueue("PUT", s.chunkPath, .error(401, "access_token_expired"))
+        s.h.server.enqueue("GET", s.chunkPath, .error(401, "access_token_expired"))
+        s.h.server.enqueue("POST", "/v1/auth/refresh", .json(200, AuthServer.pairJSON(2)))
+        s.h.server.enqueue("GET", s.chunkPath, .json(200, Fx.uploadEnvelope(s.session())))
+        s.h.server.enqueue("PUT", s.chunkPath, .json(200, Fx.uploadResult(s.session("completed", received: 10), audio: true, job: Fx.job(meetingID: s.meeting.id))))
+        await s.run()
+
+        #expect(s.h.server.requests(.post, "/v1/auth/refresh").count == 1)
+        #expect(s.h.server.requests(.put, s.chunkPath).map { $0.headers["Authorization"] } == ["Bearer at_1", "Bearer at_2"])
+        #expect(s.transport.sent.map(\.offset) == ["0", "0"])
+        #expect(s.h.server.requests(.post, s.createPath).count == 1)
+        #expect(s.h.server.requests(.post, "/v1/meetings").filter { $0.path == "/v1/meetings" }.isEmpty)
+        #expect(s.upload.state == .verified)
+        #expect(s.h.store.intents(s.meeting.id).isEmpty)
+        #expect(s.h.app.auth.tokens?.refreshToken == "rt_2")
+    }
+
+    @Test func chunkTaskIsCreatedWithATokenValidForFiveMinutes() async throws {
+        let s = try await setup()
+        s.h.app.auth.saveTokens(.pair("at_1", expiresIn: 120))
+        defer { s.h.app.auth.clearSession() }
+        s.h.server.enqueue("POST", s.createPath, .json(201, Fx.uploadEnvelope(s.session())))
+        s.h.server.enqueue("POST", "/v1/auth/refresh", .json(200, AuthServer.pairJSON(2)))
+        s.h.server.enqueue("PUT", s.chunkPath, .json(200, Fx.uploadResult(s.session("completed", received: 10), audio: true, job: Fx.job(meetingID: s.meeting.id))))
+        await s.run()
+
+        #expect(s.h.server.requests.map(\.path).filter { $0 != "/v1/config" } == [s.createPath, "/v1/auth/refresh", s.chunkPath])
+        #expect(s.h.server.requests(.post, s.createPath).first?.headers["Authorization"] == "Bearer at_1")
+        #expect(s.h.server.requests(.put, s.chunkPath).first?.headers["Authorization"] == "Bearer at_2")
+        #expect(s.upload.state == .verified)
     }
 
     @Test func offsetMismatchResumesFromReceivedBytesAndStagesChunks() async throws {
@@ -274,6 +315,36 @@ struct UploadManagerFlowTests {
         await s.run()
         #expect(s.h.server.requests.allSatisfy { $0.path == "/v1/config" })
         #expect(s.meeting.localPhase == .waitingConnection)
+    }
+
+    @Test func uploadCreateCarriesTheIntentNotesMode() async throws {
+        let s = try await setup()
+        s.intent.body = APICoding.encode(TranscriptionRequest(language: .id, notes: .skip))
+        s.h.store.save()
+        s.h.server.enqueue("POST", s.createPath, .json(201, Fx.uploadEnvelope(s.session())))
+        s.h.server.enqueue("PUT", s.chunkPath, .json(200, Fx.uploadResult(s.session("completed", received: 10), audio: true, job: Fx.job(meetingID: s.meeting.id))))
+        await s.run()
+
+        let create = try #require(s.h.server.requests(.post, s.createPath).first).json
+        let transcription = try #require(create["transcription"] as? [String: Any])
+        #expect(transcription["notes"] as? String == "skip")
+    }
+
+    @Test func blockedAutoStartParksTheIntentWithoutPostingTranscription() async throws {
+        let s = try await setup()
+        let blocked = Fx.uploadResult(s.session("completed", received: 10), audio: true)
+            .replacingOccurrences(of: #""job":null}"#, with: #""job":null,"transcription_blocked":{"code":"ai_generation_limit","next_slot_at":"2026-11-06T05:00:00.000Z"}}"#)
+        s.h.server.enqueue("POST", s.createPath, .json(201, Fx.uploadEnvelope(s.session())))
+        s.h.server.enqueue("PUT", s.chunkPath, .json(200, blocked))
+        await s.run()
+        await s.manager.resumeAll()
+        await s.manager.waitUntilIdle()
+
+        #expect(s.upload.state == .verified)
+        #expect(IntentSender.isBlockedByAILimit(s.intent))
+        #expect(s.h.store.intents(s.meeting.id).count == 1)
+        #expect(s.h.server.requests(.post, "/transcription").isEmpty)
+        #expect(s.meeting.activeJobTypes.isEmpty)
     }
 
     @Test func quotaExceededWaitsAndLogsOnce() async throws {

@@ -58,6 +58,8 @@ enum UploadPlanner {
     static func next(after error: APIError, stage: Stage, checksumRestarts: Int) -> Action {
         switch error {
         case .unauthenticated: return .stop
+        // A chunk task outlived its bearer: the session GET refreshes the token, then the chunk is sent again.
+        case .accessTokenExpired: return .refreshSession
         case .offline: return .waitForConnection
         case .meetingIdConflict: return .orphan
         case .checksumMismatch:

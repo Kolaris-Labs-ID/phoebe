@@ -11,6 +11,7 @@ type AuthService = *auth.Service
 func (s *Server) routesAuth() []Route {
 	rs := []Route{
 		{Method: "POST", Path: "/v1/auth/apple", Public: true, Handle: s.authApple},
+		{Method: "POST", Path: "/v1/auth/refresh", Public: true, Handle: s.authRefresh},
 		{Method: "POST", Path: "/v1/auth/logout", Handle: s.authLogout},
 	}
 	if s.Config.DevLoginEnabled {
@@ -44,6 +45,21 @@ func (s *Server) authDev(w http.ResponseWriter, r *http.Request) error {
 		return err
 	}
 	writeJSON(w, http.StatusOK, res)
+	return nil
+}
+
+func (s *Server) authRefresh(w http.ResponseWriter, r *http.Request) error {
+	var in struct {
+		RefreshToken string `json:"refresh_token"`
+	}
+	if _, err := decodeJSON(r, &in); err != nil {
+		return err
+	}
+	t, err := s.Auth.Refresh(r.Context(), in.RefreshToken)
+	if err != nil {
+		return err
+	}
+	writeJSON(w, http.StatusOK, t)
 	return nil
 }
 

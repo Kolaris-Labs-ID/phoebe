@@ -11,6 +11,7 @@ enum PipelineState: String, Codable, Sendable {
     case awaitingAudio = "awaiting_audio"
     case uploading, uploaded, transcribing
     case transcriptionFailed = "transcription_failed"
+    case transcriptReady = "transcript_ready"
     case generatingNotes = "generating_notes"
     case notesFailed = "notes_failed"
     case notesReady = "notes_ready"
@@ -39,6 +40,15 @@ enum RevisionOrigin: String, Codable, Sendable {
 
 enum TranscriptKind: String, Codable, Sendable {
     case original, correction
+}
+
+// "chunk" start/end are our silence-aligned chunk bounds, not provider timestamps: always shown as approximate.
+enum TranscriptTiming: String, Codable, Sendable {
+    case segment, chunk
+}
+
+enum NotesMode: String, Codable, Sendable {
+    case auto, skip
 }
 
 enum UploadStatus: String, Codable, Sendable {
@@ -97,11 +107,24 @@ struct UserDTO: Codable, Equatable, Sendable {
     let createdAt: Date
 }
 
+struct TokenPairDTO: Codable, Equatable, Sendable {
+    let accessToken: String
+    let accessTokenExpiresAt: Date
+    let refreshToken: String
+    let refreshTokenExpiresAt: Date
+    let sessionExpiresAt: Date
+}
+
 struct AuthResponseDTO: Decodable, Sendable {
-    let token: String
-    let expiresAt: Date
-    let created: Bool
     let user: UserDTO
+    let tokens: TokenPairDTO
+
+    private enum CodingKeys: String, CodingKey { case user }
+
+    init(from decoder: Decoder) throws {
+        user = try decoder.container(keyedBy: CodingKeys.self).decode(UserDTO.self, forKey: .user)
+        tokens = try TokenPairDTO(from: decoder)
+    }
 }
 
 struct UserEnvelope: Decodable, Sendable { let user: UserDTO }
@@ -264,10 +287,16 @@ struct MeetingListItemDTO: Codable, Equatable, Sendable {
 
 struct UploadEnvelope: Decodable, Sendable { let upload: UploadSessionDTO }
 
+struct TranscriptionBlockedDTO: Decodable, Equatable, Sendable {
+    let code: String
+    let nextSlotAt: Date?
+}
+
 struct UploadResultDTO: Decodable, Sendable {
     let upload: UploadSessionDTO
     let audio: AudioAssetDTO?
     let job: JobDTO?
+    let transcriptionBlocked: TranscriptionBlockedDTO?
 }
 
 struct JobEnvelope: Decodable, Sendable { let job: JobDTO }
@@ -277,15 +306,74 @@ struct TranscriptSegment: Codable, Equatable, Identifiable, Sendable {
     let startMs: Int
     let endMs: Int
     var text: String
+    var uncertain: Bool
+    var uncertainReason: String?
+    // Copied from the revision so locally stored segments (segmentsJSON) keep it; absent → chunk (never imply precision).
+    var timing: TranscriptTiming
+
+    init(id: String, startMs: Int, endMs: Int, text: String, uncertain: Bool = false, uncertainReason: String? = nil, timing: TranscriptTiming = .segment) {
+        self.id = id
+        self.startMs = startMs
+        self.endMs = endMs
+        self.text = text
+        self.uncertain = uncertain
+        self.uncertainReason = uncertainReason
+        self.timing = timing
+    }
+
+    var isApproximate: Bool { timing == .chunk }
+
+    enum CodingKeys: String, CodingKey { case id, startMs, endMs, text, uncertain, uncertainReason, timing }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        startMs = try c.decode(Int.self, forKey: .startMs)
+        endMs = try c.decode(Int.self, forKey: .endMs)
+        text = try c.decode(String.self, forKey: .text)
+        uncertain = try c.decodeIfPresent(Bool.self, forKey: .uncertain) ?? false
+        uncertainReason = try c.decodeIfPresent(String.self, forKey: .uncertainReason)
+        timing = try c.decodeIfPresent(TranscriptTiming.self, forKey: .timing) ?? .chunk
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(startMs, forKey: .startMs)
+        try c.encode(endMs, forKey: .endMs)
+        try c.encode(text, forKey: .text)
+        try c.encode(uncertain, forKey: .uncertain)
+        try c.encodeNullable(uncertainReason, forKey: .uncertainReason)
+        try c.encode(timing, forKey: .timing)
+    }
 }
 
-struct TranscriptRevisionDTO: Codable, Equatable, Sendable {
+struct TranscriptRevisionDTO: Decodable, Equatable, Sendable {
     let id: UUID
     let revisionNumber: Int
     let kind: TranscriptKind
     let language: String
+    let timing: TranscriptTiming
     let createdAt: Date
     let segments: [TranscriptSegment]?
+
+    enum CodingKeys: String, CodingKey { case id, revisionNumber, kind, language, timing, createdAt, segments }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        revisionNumber = try c.decode(Int.self, forKey: .revisionNumber)
+        kind = try c.decode(TranscriptKind.self, forKey: .kind)
+        language = try c.decode(String.self, forKey: .language)
+        let timing = try c.decode(TranscriptTiming.self, forKey: .timing)
+        self.timing = timing
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        segments = try c.decodeIfPresent([TranscriptSegment].self, forKey: .segments)?.map {
+            var segment = $0
+            segment.timing = timing
+            return segment
+        }
+    }
 }
 
 struct TranscriptRevisionEnvelope: Decodable, Sendable { let revision: TranscriptRevisionDTO }
@@ -374,15 +462,12 @@ struct EntitlementDTO: Codable, Equatable, Sendable {
 }
 
 struct AIGenerationsDTO: Codable, Equatable, Sendable {
-    let limitPerDay: Int
-    let usedLast24h: Int
-    let nextAvailableAt: Date?
-
-    // convertFromSnakeCase maps used_last_24h to "usedLast24H".
-    enum CodingKeys: String, CodingKey {
-        case limitPerDay, nextAvailableAt
-        case usedLast24h = "usedLast24H"
-    }
+    let limit: Int
+    let windowHours: Int
+    let used: Int
+    let reserved: Int
+    let remaining: Int
+    let nextSlotAt: Date?
 }
 
 struct UsageDTO: Codable, Equatable, Sendable {
@@ -415,6 +500,7 @@ struct AppleAuthRequest: Encodable, Sendable {
 }
 
 struct DevAuthRequest: Encodable, Sendable { let subject: String }
+struct RefreshRequest: Encodable, Sendable { let refreshToken: String }
 
 struct UpdateMeRequest: Encodable, Sendable {
     var displayName: String?
@@ -467,13 +553,15 @@ struct RenameRequest: Encodable, Sendable { let name: String }
 struct TranscriptionStart: Encodable, Sendable {
     let idempotencyKey: UUID
     let language: TranscriptionLanguage
+    var notes: NotesMode = .auto
 
-    enum CodingKeys: String, CodingKey { case idempotencyKey, language }
+    enum CodingKeys: String, CodingKey { case idempotencyKey, language, notes }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(idempotencyKey.lower, forKey: .idempotencyKey)
         try c.encode(language, forKey: .language)
+        try c.encode(notes, forKey: .notes)
     }
 }
 
@@ -498,6 +586,19 @@ struct CreateUploadRequest: Encodable, Sendable {
 
 struct TranscriptionRequest: Codable, Equatable, Sendable {
     let language: TranscriptionLanguage
+    var notes: NotesMode = .auto
+
+    init(language: TranscriptionLanguage, notes: NotesMode = .auto) {
+        self.language = language
+        self.notes = notes
+    }
+
+    // Intent bodies persisted before `notes` existed decode as auto (the server default).
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        language = try c.decode(TranscriptionLanguage.self, forKey: .language)
+        notes = try c.decodeIfPresent(NotesMode.self, forKey: .notes) ?? .auto
+    }
 }
 
 struct SegmentEdit: Encodable, Sendable {
@@ -509,14 +610,16 @@ struct TranscriptCorrectionRequest: Encodable, Sendable {
     let expectedRevision: Int
     let mutationId: UUID
     let edits: [SegmentEdit]
+    var resolvedUncertainSegmentIds: [String] = []
 
-    enum CodingKeys: String, CodingKey { case expectedRevision, mutationId, edits }
+    enum CodingKeys: String, CodingKey { case expectedRevision, mutationId, edits, resolvedUncertainSegmentIds }
 
     func encode(to encoder: Encoder) throws {
         var c = encoder.container(keyedBy: CodingKeys.self)
         try c.encode(expectedRevision, forKey: .expectedRevision)
         try c.encode(mutationId.lower, forKey: .mutationId)
         try c.encode(edits, forKey: .edits)
+        try c.encode(resolvedUncertainSegmentIds, forKey: .resolvedUncertainSegmentIds)
     }
 }
 

@@ -11,6 +11,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"testing"
@@ -110,6 +111,8 @@ const manualNotesFixture = `{"schema_version": 1, "items": [
   {"id": "n2", "text": "- follow up vendor", "at_ms": null}
 ]}`
 
+var approxPins = documents.Pins{Segments: pins.Segments, NoteIDs: pins.NoteIDs, Approximate: true}
+
 type fixture struct {
 	name string
 	in   Input
@@ -117,7 +120,12 @@ type fixture struct {
 
 func mustContent(t testing.TB, kind documents.Kind, raw string) documents.Content {
 	t.Helper()
-	c, err := documents.ValidateContent(kind, []byte(raw), pins)
+	return mustContentPins(t, kind, raw, pins)
+}
+
+func mustContentPins(t testing.TB, kind documents.Kind, raw string, p documents.Pins) documents.Content {
+	t.Helper()
+	c, err := documents.ValidateContent(kind, []byte(raw), p)
 	if err != nil {
 		t.Fatalf("fixture %s invalid: %v", kind, err)
 	}
@@ -132,6 +140,8 @@ func fixtures(t testing.TB) []fixture {
 		{"mom_empty", Input{Content: mustContent(t, documents.KindMoM, emptyMoMFixture), IsDraft: false, CreatedAt: createdAt}},
 		{"ai_notes", Input{Content: mustContent(t, documents.KindAINotes, aiNotesFixture), Header: notesHeader, Language: "id", IsDraft: false, CreatedAt: createdAt}},
 		{"manual_notes", Input{Content: mustContent(t, documents.KindManualNotes, manualNotesFixture), Header: Header{Timezone: "Asia/Jakarta"}, Language: "id", IsDraft: true, CreatedAt: createdAt}},
+		{"mom_approx", Input{Content: mustContentPins(t, documents.KindMoM, momFixture, approxPins), IsDraft: false, CreatedAt: createdAt}},
+		{"ai_notes_approx", Input{Content: mustContentPins(t, documents.KindAINotes, aiNotesFixture, approxPins), Header: notesHeader, Language: "id", IsDraft: true, CreatedAt: createdAt}},
 	}
 }
 
@@ -266,6 +276,179 @@ func TestExportConsistency(t *testing.T) {
 			t.Errorf("empty MoM %s: empty summary must be omitted", f)
 		}
 	}
+}
+
+func TestApproximateRefs(t *testing.T) {
+	fx := fixtures(t)
+	exact, momApprox, notesApprox := texts(t, fx[0].in), texts(t, fx[4].in), texts(t, fx[5].in)
+	for f, s := range exact {
+		if strings.Contains(s, "~") {
+			t.Errorf("exact %s must not mark times or print the legend:\n%s", f, s)
+		}
+	}
+	for _, c := range []struct {
+		all    map[Format]string
+		legend string
+		refs   []string
+	}{
+		{momApprox, "~ = perkiraan waktu", []string{"Budget marketing naik 10% menjadi Rp60 juta. [~01:02, ~1:02:05]",
+			"Rilis hari Jumat. [~05:40] (dari catatan pengguna)", "Rencana rilis [~05:40]", "[~1:02:05]"}},
+		{notesApprox, "~ = approximate time", []string{"Marketing budget up 10%. [~01:02]", "Friday release [~1:02:05]", "Vendor shortlist (from user notes)"}},
+	} {
+		for _, f := range []Format{MD, DOCX, PDF} {
+			norm := strings.Join(strings.Fields(c.all[f]), " ")
+			for _, want := range c.refs {
+				if !strings.Contains(norm, want) {
+					t.Errorf("%s missing %q\n%s", f, want, norm)
+				}
+			}
+			if n := strings.Count(c.all[f], c.legend); n != 1 {
+				t.Errorf("%s legend %q count %d, want 1", f, c.legend, n)
+			}
+			if !strings.HasSuffix(strings.TrimSpace(c.all[f]), c.legend) && f != PDF {
+				t.Errorf("%s legend is not the last line", f)
+			}
+		}
+		if strings.Contains(c.all[WhatsApp], "~") {
+			t.Error("whatsapp renders no refs, so no approximate marks or legend")
+		}
+	}
+	if md := string(render(t, fx[4].in, MD)); !strings.Contains(md, `[\~01:02, \~1:02:05]`) || !strings.HasSuffix(md, "\n\n\\~ = perkiraan waktu\n") {
+		t.Errorf("md must escape ~ in refs and legend:\n%s", md)
+	}
+	if doc := docxDocumentXML(t, render(t, fx[4].in, DOCX)); !strings.Contains(doc, "[~01:02, ~1:02:05]") || !strings.Contains(doc, ">~ = perkiraan waktu<") {
+		t.Errorf("docx missing approximate refs or legend:\n%s", doc)
+	}
+}
+
+func TestFontRuns(t *testing.T) {
+	cases := map[string][]fontRun{
+		"":                {},
+		"Rapat ñ":         {{pdfFont, "Rapat ñ"}},
+		"∑":               {{pdfFallback, "∑"}},
+		"Total ∑ → biaya": {{pdfFont, "Total "}, {pdfFallback, "∑ → "}, {pdfFont, "biaya"}},
+		"a\n∑ 中":          {{pdfFont, "a\n"}, {pdfFallback, "∑ 中"}},
+	}
+	for in, want := range cases {
+		got := fontRuns(in, "")
+		if len(got) != len(want) {
+			t.Errorf("fontRuns(%q) = %q, want %q", in, got, want)
+			continue
+		}
+		for i := range want {
+			if got[i] != want[i] {
+				t.Errorf("fontRuns(%q) = %q, want %q", in, got, want)
+			}
+		}
+	}
+	for _, style := range []string{"", "B"} {
+		if primaryCoverage[style].has('∑') || !fallbackCoverage[style].has('∑') || !primaryCoverage[style].has('ñ') || primaryCoverage[style].has(0x1F44D) {
+			t.Errorf("coverage tables wrong for style %q", style)
+		}
+	}
+}
+
+var baseFonts = regexp.MustCompile(`/BaseFont /([A-Za-z0-9+_-]+)`)
+
+func embeddedFonts(b []byte) string {
+	var names []string
+	for _, m := range baseFonts.FindAllSubmatch(b, -1) {
+		names = append(names, string(m[1]))
+	}
+	return strings.Join(names, " ")
+}
+
+func TestPDFFontFallback(t *testing.T) {
+	raw := `{"schema_version":1,"language":"id","sections":[
+	  {"id":"sec_1","heading":"Anggaran → Rilis","style":"bullet","items":[
+	    {"id":"it_1","text":"Keputusan: anggaran pemasaran naik ∑ 10% → Rp60 juta, disetujui oleh Ibu Siti.","origin":"human","edited":false,"sources":[]},
+	    {"id":"it_2","text":"Pengujian selesai hari Kamis; rilis Jumat.","origin":"human","edited":false,"sources":[]}]}]}`
+	in := Input{Content: mustContent(t, documents.KindAINotes, raw), Header: Header{Title: "Rapat Anggaran", Timezone: "Asia/Jakarta"}, CreatedAt: createdAt}
+	b, err := Render(in, PDF)
+	if err != nil {
+		t.Fatal(err)
+	}
+	fonts := embeddedFonts(b)
+	for _, want := range []string{"utf8notosans", "utf8notosansB", "utf8dejavusans", "utf8dejavusansB"} {
+		if !slices.Contains(strings.Fields(fonts), want) {
+			t.Errorf("font %s not embedded: %s", want, fonts)
+		}
+	}
+	if n := strings.Count(string(b), "/FontFile2"); n != 4 {
+		t.Errorf("embedded font files = %d, want 4", n)
+	}
+	text := strings.Join(strings.Fields(pdfToText(t, b)), " ")
+	for _, want := range []string{"Anggaran → Rilis", "Keputusan: anggaran pemasaran naik ∑ 10% → Rp60 juta, disetujui oleh Ibu Siti.",
+		"Pengujian selesai hari Kamis; rilis Jumat.", "Rapat Anggaran"} {
+		if !strings.Contains(text, want) {
+			t.Errorf("pdf text missing %q\n%s", want, text)
+		}
+	}
+	if !bytes.Equal(b, render(t, in, PDF)) {
+		t.Error("mixed-font pdf not deterministic")
+	}
+
+	var ws []string
+	for i := 1; i <= 900; i++ {
+		w := fmt.Sprintf("kata%04d", i)
+		if i%7 == 0 {
+			w += "→∑"
+		}
+		ws = append(ws, w)
+	}
+	long := `{"schema_version":1,"language":"id","sections":[{"id":"sec_1","heading":"Panjang","style":"bullet","items":[
+	  {"id":"it_1","text":"` + strings.Join(ws, " ") + `","origin":"human","edited":false,"sources":[]}]}]}`
+	lin := Input{Content: mustContent(t, documents.KindAINotes, long), Header: Header{Timezone: "UTC"}, CreatedAt: createdAt}
+	lb := render(t, lin, PDF)
+	if pageCount(t, lb) < 2 {
+		t.Fatal("long mixed-font text should span pages")
+	}
+	ltext := pdfToText(t, lb)
+	for _, w := range ws {
+		if !strings.Contains(ltext, w) {
+			t.Fatalf("word %s lost in mixed-font wrapping", w)
+		}
+	}
+
+	plain := render(t, fixtures(t)[0].in, PDF)
+	if fonts := embeddedFonts(plain); strings.Contains(fonts, "DejaVu") {
+		t.Errorf("fallback embedded although unused: %s", fonts)
+	}
+}
+
+func TestDOCXFonts(t *testing.T) {
+	raw := `{"schema_version":1,"items":[{"id":"n1","text":"Total ∑ biaya","at_ms":null}]}`
+	in := Input{Content: mustContent(t, documents.KindManualNotes, raw), Header: Header{Timezone: "UTC"}, Language: "id", CreatedAt: createdAt}
+	b := render(t, in, DOCX)
+	doc := docxDocumentXML(t, b)
+	want := `<w:r><w:t xml:space="preserve">Total </w:t></w:r><w:r><w:rPr><w:rFonts w:ascii="DejaVu Sans" w:hAnsi="DejaVu Sans" w:eastAsia="DejaVu Sans" w:cs="DejaVu Sans"/></w:rPr><w:t xml:space="preserve">∑ </w:t></w:r><w:r><w:t xml:space="preserve">biaya</w:t></w:r>`
+	if !strings.Contains(doc, want) {
+		t.Errorf("document.xml missing fallback runs:\n%s", doc)
+	}
+	if err := wellFormed([]byte(doc)); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(stylesXML, `<w:rFonts w:ascii="Noto Sans" w:hAnsi="Noto Sans" w:eastAsia="Noto Sans" w:cs="Noto Sans"/>`) {
+		t.Error("styles default font is not Noto Sans")
+	}
+}
+
+func docxDocumentXML(t *testing.T, b []byte) string {
+	t.Helper()
+	zr, err := zip.NewReader(bytes.NewReader(b), int64(len(b)))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, f := range zr.File {
+		if f.Name == "word/document.xml" {
+			rc, _ := f.Open()
+			defer rc.Close()
+			data, _ := io.ReadAll(rc)
+			return string(data)
+		}
+	}
+	t.Fatal("no document.xml")
+	return ""
 }
 
 func TestNoIdsOrURLsInOutput(t *testing.T) {
@@ -568,6 +751,6 @@ func pageCount(t *testing.T, b []byte) int {
 	return n
 }
 
-var mdEscapes = regexp.MustCompile(`\\([\\*_` + "`" + `\[\]<>|#+\-.])`)
+var mdEscapes = regexp.MustCompile(`\\([\\*_` + "`" + `\[\]<>|#+\-.~])`)
 
 func mdUnescape(s string) string { return mdEscapes.ReplaceAllString(s, "$1") }

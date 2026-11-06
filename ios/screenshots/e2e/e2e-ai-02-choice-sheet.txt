@@ -1,0 +1,127 @@
+Optional(Attributes: Application, 0x10c0052a0, pid: 33567, label: 'Phoebe'
+Element subtree:
+ →Application, 0x10c0052a0, pid: 33567, label: 'Phoebe'
+    Window (Main), 0x10c009710, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x10c017940, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x10c017a60, {{0.0, 0.0}, {440.0, 956.0}}
+          Other, 0x10c0177f0, {{-440.0, -956.0}, {1320.0, 2868.0}}, identifier: 'PopoverDismissRegion', label: 'tutup popup'
+          Other, 0x10c00d850, {{0.0, 0.0}, {440.0, 956.0}}
+            Other, 0x10c017b80, {{0.0, 0.0}, {440.0, 956.0}}
+              Other, 0x10c017ca0, {{0.0, 0.0}, {440.0, 956.0}}
+                NavigationBar, 0x10c017dc0, {{0.0, 56.3}, {440.0, 44.0}}, identifier: 'Meeting'
+                  Button, 0x10c017ee0, {{0.0, 56.3}, {96.3, 44.0}}, label: 'Meeting'
+                  Other, 0x10c018000, {{368.0, 56.3}, {52.0, 44.0}}, label: 'Tindakan lain'
+                    Other, 0x10c018120, {{368.0, 56.3}, {52.0, 44.0}}
+                      Button, 0x10c018240, {{368.0, 52.3}, {52.0, 52.0}}, label: 'Tindakan lain'
+                        Button, 0x10c018360, {{368.0, 52.3}, {52.0, 52.0}}
+                          Other, 0x10c018480, {{368.0, 52.3}, {52.0, 52.0}}
+                            Image, 0x10c0185a0, {{368.0, 52.3}, {52.0, 52.0}}, identifier: 'ellipsis.circle', label: 'Lainnya'
+                  StaticText, 0x10c0186c0, {{219.7, 78.0}, {1.0, 1.0}}, label: 'Meeting'
+                    Other, 0x10c0187e0, {{219.7, 78.0}, {1.0, 1.0}}
+                      Other, 0x10c018900, {{219.7, 78.0}, {1.0, 1.0}}
+                Other, 0x10c018a20, {{0.0, 0.0}, {440.0, 956.0}}
+                  Other, 0x10c018b40, {{0.0, 0.0}, {440.0, 956.0}}
+                    Other, 0x107709b60, {{0.0, 0.0}, {440.0, 956.0}}
+                      Other, 0x10770db60, {{0.0, 0.0}, {440.0, 956.0}}
+                        ScrollView, 0x1077102b0, {{0.0, 0.0}, {440.0, 956.0}}
+                          Other, 0x1077103d0, {{0.0, 100.3}, {440.0, 836.0}}
+                            Other, 0x10770dea0, {{16.0, 108.3}, {408.0, 760.0}}
+                              Button, 0x10770dfc0, {{16.0, 108.3}, {123.3, 26.3}}, label: 'RapatUjiE2E'
+                              StaticText, 0x10770e0e0, {{16.0, 142.7}, {229.7, 18.0}}, label: 'Tanggal belum ditentukan · 00:20'
+                              Other, 0x10770e200, {{18.0, 168.7}, {277.0, 44.0}}
+                                Image, 0x10770e320, {{18.0, 183.7}, {21.7, 14.7}}, identifier: 'person.2', label: 'person.2'
+                                StaticText, 0x10770e440, {{48.7, 181.7}, {128.0, 18.0}}, label: 'Belum ada peserta'
+                                Button, 0x10770e560, {{184.7, 168.7}, {110.3, 44.0}}, label: 'Tambah peserta'
+                              ScrollView, 0x10770e680, {{16.0, 220.7}, {408.0, 44.0}}
+                                Other, 0x10770e7a0, {{16.0, 220.7}, {208.0, 44.0}}
+                                  Button, 0x10770e8c0, {{16.0, 220.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                    Image, 0x10770e9e0, {{25.3, 237.0}, {13.7, 11.0}}, identifier: 'folder', label: 'Pindahkan'
+                                    StaticText, 0x10770eb00, {{16.0, 220.7}, {112.7, 44.0}}, label: 'Tanpa folder'
+                                  Button, 0x10770ec20, {{136.7, 220.7}, {87.3, 44.0}}, label: 'Tag baru'
+                                    Image, 0x10770ed40, {{146.0, 237.3}, {10.0, 10.0}}, identifier: 'plus', label: 'Tambah'
+                                    StaticText, 0x10770ee60, {{136.7, 220.7}, {87.3, 44.0}}, label: 'Tag baru'
+                              Other, 0x10770ef80, {{51.3, 292.7}, {77.3, 36.3}}, label: 'Upload: Selesai'
+                                Image, 0x10770f0a0, {{51.3, 294.3}, {21.0, 14.7}}, identifier: 'checkmark.icloud', label: 'checkmark.icloud', Selected
+                                StaticText, 0x10770f1c0, {{77.7, 292.7}, {51.0, 18.0}}, label: 'Upload'
+                                StaticText, 0x10770f2e0, {{68.5, 314.7}, {41.7, 14.3}}, label: 'Selesai'
+                              Other, 0x10770f690, {{169.3, 292.7}, {101.3, 36.3}}, label: 'Transkrip: Menunggu slot AI'
+                                Image, 0x10770f7b0, {{179.3, 294.0}, {10.0, 15.3}}, identifier: 'hourglass', label: 'Durasi'
+                                StaticText, 0x10770f8d0, {{195.2, 292.7}, {67.7, 18.0}}, label: 'Transkrip'
+                                StaticText, 0x107710c10, {{169.3, 314.7}, {101.3, 14.3}}, label: 'Menunggu slot AI'
+                              Other, 0x107710d30, {{319.3, 292.7}, {64.8, 36.3}}, label: 'Notes: Menunggu'
+                                Image, 0x107710e50, {{319.3, 294.0}, {16.7, 15.3}}, identifier: 'note.text', label: 'Catatan'
+                                StaticText, 0x107710f70, {{341.8, 292.7}, {42.3, 18.0}}, label: 'Notes'
+                                StaticText, 0x107711090, {{319.8, 314.7}, {61.7, 14.3}}, label: 'Menunggu'
+                              Image, 0x1077111b0, {{30.0, 370.0}, {10.0, 15.3}}, identifier: 'hourglass', label: 'Durasi'
+                              StaticText, 0x1077112d0, {{54.0, 369.0}, {334.7, 85.7}}, label: 'Transkripsi menunggu slot AI, Transkripsi belum dimulai dan menit belum terpakai. Slot berikutnya tersedia 7 Nov 2026, 10.02 (dalam 23 jam).'
+                                StaticText, 0x1077113f0, {{54.0, 369.0}, {231.3, 20.3}}, label: 'Transkripsi menunggu slot AI'
+                                StaticText, 0x107711510, {{54.0, 393.3}, {334.7, 61.3}}, label: 'Transkripsi belum dimulai dan menit belum terpakai. Slot berikutnya tersedia 7 Nov 2026, 10.02 (dalam 23 jam).'
+                              Button, 0x107711630, {{54.0, 462.7}, {129.0, 46.0}}, label: 'Pilih cara lanjut'
+                              Button, 0x107711750, {{28.0, 548.7}, {44.0, 44.0}}, identifier: 'gobackward.15', label: 'Mundur 15 detik'
+                              Button, 0x107711870, {{88.0, 548.7}, {44.0, 44.0}}, identifier: 'play.fill', label: 'Putar'
+                              Button, 0x107711990, {{148.0, 548.7}, {44.0, 44.0}}, identifier: 'goforward.15', label: 'Maju 15 detik'
+                              StaticText, 0x107711ab0, {{317.3, 561.7}, {94.7, 18.0}}, label: '00:00 / 00:20'
+                              Slider, 0x107711bd0, {{28.0, 600.7}, {384.0, 31.0}}, label: 'Posisi', value: 0 detik dari 20 de...
+                              Image, 0x107711cf0, {{196.3, 742.0}, {47.3, 40.7}}, identifier: 'text.quote', label: 'Lirik'
+                              StaticText, 0x107711e10, {{117.5, 742.0}, {205.0, 85.3}}, label: 'Belum ada transkrip'
+                              StaticText, 0x107711f30, {{77.5, 830.3}, {285.0, 38.0}}, label: 'Transkrip muncul setelah audio diunggah dan diproses.'
+                              SegmentedControl, 0x107712050, {{16.0, 667.7}, {408.0, 31.0}}
+                                Button, 0x107712170, {{16.0, 667.7}, {135.0, 32.0}}, label: 'Transkrip', Selected
+                                Button, 0x107712290, {{152.0, 667.7}, {135.0, 32.0}}, label: 'Catatan'
+                                Button, 0x1077123b0, {{288.0, 667.7}, {136.0, 32.0}}, label: 'MoM'
+                          Other, 0x1077124d0, {{407.0, 100.3}, {30.0, 799.7}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                            Other, 0x1077125f0, {{434.0, 103.3}, {3.0, 782.0}}
+                          Other, 0x107712710, {{407.0, 100.3}, {30.0, 799.7}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                            Other, 0x107712830, {{434.0, 103.3}, {3.0, 782.0}}
+      Other, 0x107712950, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107712a70, {{-440.0, -956.0}, {1320.0, 2868.0}}, identifier: 'PopoverDismissRegion', label: 'tutup popup'
+        Other, 0x107712b90, {{0.0, 446.0}, {440.0, 510.0}}
+          Button, 0x107712cb0, {{182.0, 441.0}, {76.0, 25.0}}, label: 'Pengambil Lembar'
+          Other, 0x107712dd0, {{0.0, 446.0}, {440.0, 510.0}}
+            Other, 0x107712ef0, {{0.0, 446.0}, {440.0, 510.0}}
+              Other, 0x107713010, {{0.0, 446.0}, {440.0, 510.0}}
+                Other, 0x107713130, {{0.0, 446.0}, {440.0, 510.0}}
+                  Other, 0x107713250, {{0.0, 446.0}, {440.0, 510.0}}
+                    NavigationBar, 0x107713370, {{0.0, 446.0}, {440.0, 56.0}}, identifier: '_TtGC7SwiftUI32NavigationStackHosting'
+                      Other, 0x107713490, {{20.0, 460.0}, {52.0, 28.3}}, label: 'Tutup'
+                        Other, 0x1077135b0, {{20.0, 460.0}, {52.0, 28.3}}
+                          Button, 0x1077136d0, {{20.0, 460.0}, {52.0, 28.3}}, label: 'Tutup'
+                    Other, 0x1077137f0, {{0.0, 446.0}, {440.0, 510.0}}
+                      Other, 0x107713910, {{0.0, 446.0}, {440.0, 510.0}}
+                        Other, 0x107713a30, {{0.0, 446.0}, {440.0, 510.0}}
+                          Other, 0x107713b50, {{0.0, 446.0}, {440.0, 510.0}}
+                            ScrollView, 0x107713c70, {{0.0, 446.0}, {440.0, 510.0}}
+                              Other, 0x107713d90, {{0.0, 502.0}, {440.0, 514.7}}
+                                StaticText, 0x107713eb0, {{16.0, 518.0}, {218.0, 26.3}}, label: 'Slot AI belum tersedia'
+                                StaticText, 0x107713fd0, {{16.0, 560.3}, {408.0, 63.3}}, label: '30 generasi AI per 24 jam · Sisa 0. Slot berikutnya tersedia 7 Nov 2026, 10.02 (dalam 23 jam).'
+                                  Image, 0x1077140f0, {{29.3, 573.3}, {13.7, 17.0}}, identifier: 'sparkles', label: 'Berkilau'
+                                  StaticText, 0x107714210, {{29.3, 573.3}, {367.0, 38.3}}, label: '30 generasi AI per 24 jam · Sisa 0. Slot berikutnya tersedia 7 Nov 2026, 10.02 (dalam 23 jam).'
+                                StaticText, 0x107714330, {{16.0, 639.6}, {363.7, 42.3}}, label: 'Transkripsi belum dimulai, jadi menit transkripsi belum terpakai. Pilih cara melanjutkan.'
+                                StaticText, 0x107714450, {{28.0, 710.0}, {381.3, 61.3}}, label: 'Rekaman tetap tersimpan dan belum ditranskripsi. Mulai lagi saat slot tersedia; transkrip dan catatan AI lalu dibuat bersama.'
+                                Button, 0x107714570, {{28.0, 779.3}, {155.0, 50.0}}, label: 'Tunggu slot AI'
+                                  Image, 0x107714690, {{42.0, 796.7}, {10.0, 15.3}}, identifier: 'hourglass', label: 'Durasi'
+                                  StaticText, 0x1077147b0, {{28.0, 779.3}, {155.0, 50.0}}, label: 'Tunggu slot AI'
+                                StaticText, 0x1077148d0, {{28.0, 869.3}, {374.3, 61.3}}, label: 'Transkripsi dimulai sekarang dan memakai sekitar 1 menit transkripsi. Catatan AI bisa dibuat nanti dari transkrip.'
+                                Button, 0x1077149f0, {{28.0, 938.7}, {158.3, 50.0}}, label: 'Transkrip saja'
+                                  Image, 0x107714b10, {{42.0, 956.3}, {17.0, 14.7}}, identifier: 'text.quote', label: 'Lirik'
+                                  StaticText, 0x107714c30, {{28.0, 938.7}, {158.3, 50.0}}, label: 'Transkrip saja'
+                              Other, 0x107714d50, {{407.0, 502.0}, {30.0, 398.0}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                                Other, 0x107714e70, {{434.0, 784.3}, {3.0, 486.7}}
+                              Other, 0x107714f90, {{407.0, 502.0}, {30.0, 398.0}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                                Other, 0x1077150b0, {{434.0, 784.3}, {3.0, 486.7}}
+    Window, 0x1077151d0, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x1077152f0, {{0.0, 0.0}, {440.0, 956.0}}
+    Window, 0x107715410, {{0.0, 0.0}, {440.0, 956.0}}
+      Other, 0x107715530, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107715650, {{0.0, 0.0}, {440.0, 956.0}}
+        Other, 0x107715770, {{0.0, 956.0}, {440.0, 243.0}}
+    Window, 0x107715890, {{0.0, 0.0}, {146.7, 318.7}}
+      Other, 0x1077159b0, {{0.0, 0.0}, {146.7, 318.7}}
+Path to element:
+ →Application, 0x10c0052a0, pid: 33567, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x10a11b980, pid: 33567, label: 'Phoebe'
+  }
+)

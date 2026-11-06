@@ -173,7 +173,7 @@ final class SettingsModel {
     static func hasTranscript(_ meeting: Meeting) -> Bool {
         if meeting.hasTranscript { return true }
         switch meeting.pipeline {
-        case .generatingNotes, .notesFailed, .notesReady: return true
+        case .transcriptReady, .generatingNotes, .notesFailed, .notesReady: return true
         default: return false
         }
     }

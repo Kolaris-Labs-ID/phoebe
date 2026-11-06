@@ -9,7 +9,7 @@ struct ContrastTests {
         (.textSecondary, .surface), (.textSecondary, .surface2), (.textTertiary, .surface),
         (.accent, .surface), (.accent, .bg), (.onAccent, .accent), (.accent, .accentSoft),
         (.record, .surface), (.onRecord, .record), (.record, .recordSoft),
-        (.warning, .surface), (.warning, .warningSoft),
+        (.warning, .surface), (.warning, .warningSoft), (.warning, .bg), (.textSecondary, .bg),
         (.success, .surface), (.success, .successSoft),
         (.danger, .surface), (.danger, .dangerSoft),
         (.info, .surface), (.info, .infoSoft),

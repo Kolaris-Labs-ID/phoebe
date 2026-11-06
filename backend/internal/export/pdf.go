@@ -2,7 +2,6 @@ package export
 
 import (
 	"bytes"
-	_ "embed"
 	"strconv"
 	"strings"
 
@@ -11,14 +10,7 @@ import (
 	"phoebe/internal/documents"
 )
 
-//go:embed fonts/NotoSans-Regular.ttf
-var fontRegular []byte
-
-//go:embed fonts/NotoSans-Bold.ttf
-var fontBold []byte
-
 const (
-	pdfFont    = "NotoSans"
 	pdfMargin  = 20.0
 	pdfBody    = 11.0
 	pdfLine    = 5.5
@@ -28,8 +20,9 @@ const (
 )
 
 type pdfWriter struct {
-	f     *fpdf.Fpdf
-	limit float64
+	f        *fpdf.Fpdf
+	limit    float64
+	fallback map[string]bool
 }
 
 func renderPDF(d *doc, compress bool) ([]byte, error) {
@@ -57,7 +50,7 @@ func renderPDF(d *doc, compress bool) ([]byte, error) {
 		f.CellFormat(0, 5, strconv.Itoa(f.PageNo())+"/"+pdfNbAlias, "", 0, "C", false, 0, "")
 	})
 	_, pageH := f.GetPageSize()
-	w := &pdfWriter{f: f, limit: pageH - pdfMargin}
+	w := &pdfWriter{f: f, limit: pageH - pdfMargin, fallback: map[string]bool{}}
 	f.AddPage()
 
 	w.block("B", 18, 8, d.title)
@@ -82,8 +75,7 @@ func renderPDF(d *doc, compress bool) ([]byte, error) {
 					src = "-"
 				}
 				w.listItem(strconv.Itoa(i+1)+".", a.desc)
-				f.SetX(pdfMargin + pdfIndent)
-				f.MultiCell(0, pdfLine, pdfText(d.l.pic+": "+a.pic+" · "+d.l.deadline+": "+a.deadline+" · "+d.l.source+": "+src), "", "L", false)
+				w.text("", pdfBody, pdfLine, pdfMargin+pdfIndent, d.l.pic+": "+a.pic+" · "+d.l.deadline+": "+a.deadline+" · "+d.l.source+": "+src)
 				f.Ln(pdfGap)
 			}
 		case s.typ == documents.SectionDiscussion:
@@ -95,6 +87,10 @@ func renderPDF(d *doc, compress bool) ([]byte, error) {
 			w.items(s.style, s.items)
 		}
 	}
+	if d.approximate {
+		f.Ln(2)
+		w.block("", pdfBody, pdfLine, d.l.approxLegend)
+	}
 
 	var buf bytes.Buffer
 	if err := f.Output(&buf); err != nil {
@@ -104,10 +100,46 @@ func renderPDF(d *doc, compress bool) ([]byte, error) {
 }
 
 func (w *pdfWriter) block(style string, size, h float64, text string) {
-	w.f.SetFont(pdfFont, style, size)
-	w.f.SetX(pdfMargin)
-	w.f.MultiCell(0, h, pdfText(text), "", "L", false)
+	w.text(style, size, h, pdfMargin, text)
 	w.f.Ln(pdfGap)
+}
+
+// fpdf Write wraps at the left margin, so mixed-font runs move the margin to x meanwhile.
+func (w *pdfWriter) text(style string, size, h, x float64, text string) {
+	text = pdfText(text)
+	runs := fontRuns(text, style)
+	if len(runs) <= 1 {
+		fam := pdfFont
+		if len(runs) == 1 {
+			fam = runs[0].family
+		}
+		w.setFont(fam, style, size)
+		w.f.SetX(x)
+		w.f.MultiCell(0, h, text, "", "L", false)
+		return
+	}
+	left, _, _, _ := w.f.GetMargins()
+	w.f.SetLeftMargin(x)
+	w.f.SetX(x)
+	for _, r := range runs {
+		w.setFont(r.family, style, size)
+		w.f.Write(h, r.text)
+	}
+	w.f.Ln(h)
+	w.f.SetLeftMargin(left)
+}
+
+// Registered on first use so documents that never need the fallback don't embed it.
+func (w *pdfWriter) setFont(family, style string, size float64) {
+	if family == pdfFallback && !w.fallback[style] {
+		ttf := fallbackRegular
+		if style == "B" {
+			ttf = fallbackBold
+		}
+		w.f.AddUTF8FontFromBytes(pdfFallback, style, ttf)
+		w.fallback[style] = true
+	}
+	w.f.SetFont(family, style, size)
 }
 
 // heading moves to a new page when it would otherwise end a page without a body line after it.
@@ -141,7 +173,7 @@ func (w *pdfWriter) listItem(marker, text string) {
 	w.f.SetFont(pdfFont, "", pdfBody)
 	w.f.SetX(pdfMargin)
 	w.f.CellFormat(pdfIndent, pdfLine, marker, "", 0, "L", false, 0, "")
-	w.f.MultiCell(0, pdfLine, pdfText(text), "", "L", false)
+	w.text("", pdfBody, pdfLine, pdfMargin+pdfIndent, text)
 }
 
 // pdfText replaces runes outside the BMP, which fpdf's UTF-8 width table cannot hold.

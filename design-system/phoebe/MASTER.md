@@ -281,7 +281,7 @@ Leading inline badge on AI notes / MoM items, three states (api §3 `origin` + `
 Editing an AI item sets `edited`; it never silently becomes `human`.
 
 ### 7.9 Source reference
-`Button { seek } label: { Label("12:04", systemImage: "clock") }` caption, monospacedDigit, `accent`. Invalid/unverified timestamp → plain text "Rujukan tidak terverifikasi / Unverified reference", no button. From manual notes → `note.text.badge.plus` "Dari catatan pengguna / From user notes" (api SourceRef wording). Exports render refs as `[mm:ss]` server-side.
+`Button { seek } label: { Label("12:04", systemImage: "clock") }` caption, monospacedDigit, `accent`. Invalid/unverified timestamp → plain text "Rujukan tidak terverifikasi / Unverified reference", no button. From manual notes → `note.text.badge.plus` "Dari catatan pengguna / From user notes" (api SourceRef wording). A ref with `approximate: true` (chunk-timed transcript) renders `~12:04` and VoiceOver "Putar dari sekitar 12 menit, 4 detik" / "Play from about …". Exports render refs as `[mm:ss]` / `[~mm:ss]` server-side.
 
 ### 7.10 Text fields / editor
 `TextField`/`TextEditor` on `surface2`, 1pt `borderStrong` outline, radius `md`, min height 44, visible label above (`subheadline`, `textSecondary`), helper/error below (`footnote`; error in `danger` with `exclamationmark.circle`, posted as announcement). `@FocusState` to move focus.

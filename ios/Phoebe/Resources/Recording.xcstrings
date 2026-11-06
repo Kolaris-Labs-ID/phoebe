@@ -749,6 +749,23 @@
         }
       }
     },
+    "rec.stopped.next.aiSlot": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No AI slot is left right now. After upload you can wait for one or transcribe only."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Slot AI sedang habis. Setelah upload, Anda bisa menunggu slot atau transkrip saja."
+          }
+        }
+      }
+    },
     "rec.stopped.next.offline": {
       "extractionState": "manual",
       "localizations": {

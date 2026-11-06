@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 	"sync"
 
@@ -25,9 +26,12 @@ var sentences = []string{
 // STT is deterministic. Call i returns Errs[i] if non-nil, else Results[i] if present, else
 // segments every 15 s of in.DurationMS. Block waits for ctx to end (provider timeout).
 type STT struct {
-	Results []ai.STTResult
-	Errs    []error
-	Block   bool
+	Results   []ai.STTResult
+	Errs      []error
+	Block     bool
+	Timing    string
+	Uncertain []int
+	Silent    []int
 
 	mu    sync.Mutex
 	calls int
@@ -53,24 +57,34 @@ func (f *STT) Transcribe(ctx context.Context, in ai.STTInput) (ai.STTResult, err
 	if i < len(f.Errs) && f.Errs[i] != nil {
 		return ai.STTResult{}, f.Errs[i]
 	}
-	if i < len(f.Results) {
-		return f.Results[i], nil
+	timing := f.Timing
+	if timing == "" {
+		timing = ai.TimingChunk
 	}
-	return transcript(in.DurationMS, in.Language), nil
+	if i < len(f.Results) {
+		r := f.Results[i]
+		if r.Timing == "" {
+			r.Timing = timing
+		}
+		return r, nil
+	}
+	return f.transcript(in.DurationMS, in.Language, timing), nil
 }
 
-func transcript(durationMS int64, language string) ai.STTResult {
+func (f *STT) transcript(durationMS int64, language, timing string) ai.STTResult {
 	if language != "en" {
 		language = "id"
 	}
-	res := ai.STTResult{Language: language, AudioMS: durationMS, Segments: []ai.RawSegment{}}
+	res := ai.STTResult{Language: language, Timing: timing, AudioMS: durationMS, Segments: []ai.Segment{}}
 	for k, start := 0, int64(0); start < durationMS; k, start = k+1, start+segmentMS {
-		end := min(start+segmentMS, durationMS)
-		res.Segments = append(res.Segments, ai.RawSegment{
-			StartSec: float64(start) / 1000,
-			EndSec:   float64(end) / 1000,
-			Text:     sentences[k%len(sentences)],
-		})
+		if slices.Contains(f.Silent, k) {
+			continue
+		}
+		sg := ai.Segment{StartMS: start, EndMS: min(start+segmentMS, durationMS), Text: sentences[k%len(sentences)]}
+		if slices.Contains(f.Uncertain, k) {
+			sg.Uncertain, sg.UncertainReason = true, ai.UncertainLowConfidence
+		}
+		res.Segments = append(res.Segments, sg)
 	}
 	return res
 }

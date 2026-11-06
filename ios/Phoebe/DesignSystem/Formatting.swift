@@ -9,9 +9,15 @@ enum Formatting {
         return h > 0 ? String(format: "%d:%02d:%02d", h, m, s) : String(format: "%02d:%02d", m, s)
     }
 
-    static func timestamp(ms: Int) -> String { timer(ms: ms) }
+    // Chunk-timed transcripts carry chunk bounds, not word timestamps: "~mm:ss", spoken "sekitar …" / "about …".
+    static func timestamp(ms: Int, approximate: Bool = false) -> String { (approximate ? "~" : "") + timer(ms: ms) }
 
-    static func reference(ms: Int) -> String { "[\(timer(ms: ms))]" }
+    static func reference(ms: Int, approximate: Bool = false) -> String { "[\(timestamp(ms: ms, approximate: approximate))]" }
+
+    static func spokenTimestamp(ms: Int, approximate: Bool, locale: Locale = .current, localization: String? = nil) -> String {
+        let spoken = spokenDuration(ms: ms, locale: locale)
+        return approximate ? LS("time.approximate.a11y", localization: localization, spoken) : spoken
+    }
 
     static func spokenDuration(ms: Int, locale: Locale = .current, includeSeconds: Bool = true) -> String {
         let units: Set<Duration.UnitsFormatStyle.Unit> = includeSeconds ? [.hours, .minutes, .seconds] : [.hours, .minutes]

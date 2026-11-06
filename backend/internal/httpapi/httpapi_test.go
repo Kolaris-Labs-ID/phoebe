@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"phoebe/internal/apperr"
+	"phoebe/internal/jsonx"
 	"phoebe/internal/obs"
 	"phoebe/internal/testutil"
 )
@@ -74,6 +75,7 @@ func decodeErr(t *testing.T, rec *httptest.ResponseRecorder) errorObj {
 func TestCodeTableCoversAllCodes(t *testing.T) {
 	want := map[apperr.Code]int{
 		apperr.InvalidJSON: 400, apperr.MissingIdempotencyKey: 400, apperr.Unauthenticated: 401,
+		apperr.AccessTokenExpired: 401, apperr.SessionRevoked: 401, apperr.SessionExpired: 401,
 		apperr.QuotaExceeded: 402, apperr.EntitlementInactive: 402, apperr.InvalidSignature: 403, apperr.NotFound: 404,
 		apperr.RevisionConflict: 409, apperr.JobInProgress: 409, apperr.AlreadyTranscribed: 409, apperr.AudioExists: 409,
 		apperr.AudioNotReady: 409, apperr.TranscriptNotReady: 409, apperr.AINotesNotReady: 409,
@@ -83,7 +85,7 @@ func TestCodeTableCoversAllCodes(t *testing.T) {
 		apperr.PayloadTooLarge: 413, apperr.ChunkTooLarge: 413, apperr.UploadTooLarge: 413,
 		apperr.ValidationFailed: 422, apperr.InvalidContent: 422, apperr.IdempotencyKeyReused: 422,
 		apperr.ChecksumMismatch: 422, apperr.AudioUnsupported: 422, apperr.AudioCorrupt: 422, apperr.AudioEmpty: 422,
-		apperr.AudioTooLong: 422, apperr.RateLimited: 429, apperr.Internal: 500, apperr.Unavailable: 503,
+		apperr.AudioTooLong: 422, apperr.AIGenerationLimit: 429, apperr.Internal: 500, apperr.Unavailable: 503,
 	}
 	if len(codeTable) != len(want) {
 		t.Fatalf("table has %d codes, api.md §1.2 has %d", len(codeTable), len(want))
@@ -264,8 +266,10 @@ func TestErrorMappingAndRecover(t *testing.T) {
 	if rec.Code != 409 || e.Code != apperr.RevisionConflict || e.Details["current_revision_number"] != float64(7) || e.RequestID != rec.Header().Get("X-Request-ID") {
 		t.Fatal(rec.Code, rec.Body)
 	}
-	rec = serve(s, h(apperr.RateLimit(90*time.Second+time.Millisecond)), httptest.NewRequest("GET", "/e", nil))
-	if rec.Code != 429 || rec.Header().Get("Retry-After") != "91" || decodeErr(t, rec).Details["retry_after_seconds"] != float64(91) {
+	next := time.Now().Add(90*time.Second + 500*time.Millisecond)
+	rec = serve(s, h(apperr.WithDetails(apperr.AIGenerationLimit, map[string]any{"limit": 30, "remaining": 0, "next_slot_at": jsonx.TimePtr(&next)})),
+		httptest.NewRequest("GET", "/e", nil))
+	if rec.Code != 429 || rec.Header().Get("Retry-After") != "91" || decodeErr(t, rec).Details["next_slot_at"] != jsonx.FormatTime(next) {
 		t.Fatal(rec.Code, rec.Header(), rec.Body)
 	}
 	rec = serve(s, h(apperr.Field("title", apperr.ReasonTooLong)), httptest.NewRequest("GET", "/e", nil))

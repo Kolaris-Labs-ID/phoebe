@@ -5,7 +5,7 @@ Go module `phoebe`. Binaries: `cmd/api` (HTTP) and `cmd/worker` (jobs + sweeps).
 ## Prerequisites
 
 - Go 1.27, Docker (compose v2+), `jq`
-- `ffmpeg` on PATH: worker with a real STT provider, `audio` Chunker tests, chunked-transcribe test, smoke script (`brew install ffmpeg`)
+- `ffmpeg` on PATH: worker with a real STT provider (silence detection + chunking), `audio` and `ai/openai` tests, chunked-transcribe test, smoke script (`brew install ffmpeg`)
 - `pdftotext` (poppler) on PATH: PDF export tests (`brew install poppler`)
 
 Missing `DATABASE_URL`, `ffmpeg` or `pdftotext` fails the tests that need them (never skipped).
@@ -32,8 +32,10 @@ go test ./internal/app -run TestCrossAccountAllRoutes -count=1 -v
 
 # end-to-end smoke: builds + starts api and worker on :18080 (fake providers, dev login),
 # then curls the whole flow (login → meeting → 2-chunk WAV upload → auto/explicit transcription
-# → notes_ready → MoM → edit → review → md/docx/pdf/whatsapp export + signed download → audio
-# URL → delete). Prints SMOKE PASS; on failure keeps logs in the printed temp dir.
+# with notes auto → notes_ready (chunk-timed transcript, approximate refs) → MoM → edit → review
+# → md/docx/pdf/whatsapp export ([\~mm:ss] refs + legend in md) + signed download → audio URL →
+# usage incl. ai_generations → transcription only (notes skip) → transcript_ready → generate
+# notes → delete). Prints SMOKE PASS; on failure keeps logs in the printed temp dir.
 ./scripts/smoke.sh                 # SMOKE_PORT=… to change the port
 ```
 
@@ -61,7 +63,8 @@ docker compose up --build
 
 ```sh
 curl -s -X POST localhost:8080/v1/auth/dev -H 'Content-Type: application/json' -d '{"subject":"alice"}'
-# → {"token":"phb_…", …}; then: -H "Authorization: Bearer phb_…"
+# → {"access_token":"…","refresh_token":"…", …}; then: -H "Authorization: Bearer <access_token>"
+# access token lasts ACCESS_TOKEN_TTL (15m); renew: POST /v1/auth/refresh {"refresh_token":"…"}
 curl -s localhost:8080/healthz
 curl -s localhost:8080/v1/config
 ```
@@ -89,4 +92,48 @@ Job types: `transcribe`, `generate_notes`, `generate_mom`, `purge_meeting`, `pur
 | `STORAGE_DIR` | `./data/storage` (api and worker must share it) |
 | `STT_PROVIDER`, `LLM_PROVIDER` | `fake` (no API keys needed) |
 
-All other variables and defaults: `docs/backend.md` §16. Real providers: `STT_PROVIDER=openai STT_API_KEY=… STT_MODEL=whisper-1`, `LLM_PROVIDER=openaicompat LLM_BASE_URL=… LLM_API_KEY=… LLM_MODEL=…`.
+All other variables and defaults: `docs/backend.md` §16.
+
+## Real providers
+
+Fake providers stay the default for dev and tests. Real ones are adapters behind `internal/ai` (design: `docs/backend.md` §6.1); keys come only from env.
+
+```sh
+# STT: OpenAI (worker needs ffmpeg)
+export STT_PROVIDER=openai STT_API_KEY=sk-…          # STT_MODEL defaults to gpt-4o-mini-transcribe
+# LLM: DeepSeek (OpenAI-compatible chat completions, JSON output, thinking off)
+export LLM_PROVIDER=deepseek LLM_API_KEY=sk-…        # LLM_BASE_URL=https://api.deepseek.com, LLM_MODEL=deepseek-flash by default
+# LLM: any other OpenAI-compatible endpoint (LLM_BASE_URL required, no default)
+export LLM_PROVIDER=openaicompat LLM_API_KEY=… LLM_BASE_URL=https://… LLM_MODEL=…
+```
+
+| Var | Default | Notes |
+|---|---|---|
+| `STT_MODEL` | `gpt-4o-mini-transcribe` | `gpt-4o-mini-transcribe`, `gpt-4o-transcribe` → timing `chunk` (approximate, our ~30 s windows); `whisper-1` → timing `segment` (provider segment timestamps). Other values fail worker startup. |
+| `STT_CHUNK_TARGET_SECONDS` / `_MIN_` / `_MAX_` | `30` / `10` / `45` | chunk timing: cut at the silence midpoint nearest the target, hard cut at max when there is no silence; validated `min ≤ target ≤ max`, `max ≥ 2 × min` |
+| `STT_SILENCE_NOISE_DB`, `STT_SILENCE_MIN_DURATION` | `-35`, `500ms` | ffmpeg `silencedetect` over the whole file (both timings) |
+| `STT_DROP_SILENCE_RATIO` | `0.8` | segment timing (whisper-1) only: a low-confidence segment is dropped only when silence also covers this much of its span; otherwise kept with `uncertain=true`. Chunk timing keeps all low-confidence text, flagged uncertain; it skips (no call, not billed) only windows whose non-silent audio is shorter than `STT_SILENCE_MIN_DURATION` |
+| `STT_UNCERTAIN_MEAN_LOGPROB` | `-0.7` | gpt-4o models: mean token logprob below this = low confidence |
+| `STT_UNCERTAIN_AVG_LOGPROB`, `STT_UNCERTAIN_NO_SPEECH_PROB`, `STT_UNCERTAIN_COMPRESSION_RATIO` | `-1.0`, `0.6`, `2.4` | whisper-1: any one crossed = low confidence |
+| `STT_MAX_FILE_BYTES`, `STT_CHUNK_SECONDS` | `24000000`, `600` | whisper-1 only: larger files are cut into fixed pieces |
+| `LLM_PROVIDER` | `fake` | `deepseek` (sends DeepSeek's `thinking` param), `openaicompat` (any other OpenAI-compatible endpoint, no `thinking` param) |
+| `LLM_THINKING_NOTES`, `LLM_THINKING_MOM` | `false`, `false` | DeepSeek thinking mode per task (`{"thinking":{"type":"enabled"\|"disabled"}}`; DeepSeek's own default is enabled, so we always send it) |
+| `STT_PRICE_PER_MIN`, `LLM_PRICE_IN_PER_MTOK`, `LLM_PRICE_OUT_PER_MTOK` | `0` | set at deploy from the provider price list (cost tracking only) |
+
+DeepSeek `deepseek-flash` (DeepSeek-V4.1-Flash) list prices, USD per 1M tokens, from <https://api-docs.deepseek.com/quick_start/pricing/> (checked 2026-11-06; not defaults, verify before setting):
+
+| | Off-peak | Peak |
+|---|---|---|
+| Input, cache hit | 0.003 | 0.006 |
+| Input, cache miss | 0.15 | 0.30 |
+| Output | 0.60 | 1.20 |
+
+Peak is 01:00–04:00 and 06:00–10:00 UTC, Monday to Friday (excluding Chinese public holidays); everything else is off-peak. `LLM_PRICE_*` takes one figure per direction, so cost tracking uses whichever rate you set (the peak cache-miss price is the conservative choice).
+
+### Live provider checks (opt-in, real API calls)
+
+```sh
+OPENAI_API_KEY=sk-… DEEPSEEK_API_KEY=sk-… ./scripts/live-check.sh
+```
+
+Runs `TestLiveOpenAISTT` (`internal/ai/openai`, Indonesian speech fixture `testdata/speech_id.m4a` made with macOS `say -v Damayanti`; asserts non-empty text, timing `chunk` and monotonic approximate bounds) and `TestLiveDeepSeekNotesJSON` (`internal/ai/openaicompat`, notes JSON from a tiny transcript checked against the notes output schema, thinking off and on). Both need `PHOEBE_LIVE=1` plus their key; otherwise they print `SKIPPED …` naming the env vars, so `go test ./...` never calls a provider.

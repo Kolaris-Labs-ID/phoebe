@@ -132,7 +132,7 @@ type User struct {
 }
 
 // CreateUser inserts a dev user with an active trial entitlement (quotaSeconds) and a
-// session; Token is a valid bearer token (sessions.token_hash = sha256(token)).
+// session; Token is a valid access token (session_tokens.access_token_hash = sha256(token)).
 func CreateUser(t testing.TB, q db.Querier, quotaSeconds int64) User {
 	t.Helper()
 	ctx := context.Background()
@@ -158,7 +158,9 @@ func CreateSession(t testing.TB, q db.Querier, userID string) string {
 	token := "phb_" + base64.RawURLEncoding.EncodeToString(b)
 	sum := sha256.Sum256([]byte(token))
 	if _, err := q.Exec(context.Background(),
-		`INSERT INTO sessions (user_id, token_hash, expires_at) VALUES ($1, $2, now() + interval '1 day')`,
+		`WITH s AS (INSERT INTO sessions (user_id, expires_at) VALUES ($1, now() + interval '1 day') RETURNING id)
+		 INSERT INTO session_tokens (session_id, access_token_hash, access_expires_at, refresh_token_hash)
+		 SELECT id, $2, now() + interval '1 day', sha256(gen_random_uuid()::text::bytea) FROM s`,
 		userID, sum[:]); err != nil {
 		t.Fatalf("testutil: insert session: %v", err)
 	}

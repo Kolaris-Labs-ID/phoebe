@@ -2,7 +2,8 @@ import XCTest
 
 // Full flow against the real backend on localhost:8080 (fake providers, dev login).
 // Needs an m4a named PHOEBE_E2E_FILE (default "RapatUjiE2E") in the simulator's Files "On My iPhone".
-// Env (prefix TEST_RUNNER_ when passed through xcodebuild): PHOEBE_SHOTS_DIR, PHOEBE_E2E_SUBJECT, PHOEBE_E2E_FILE.
+// Env (prefix TEST_RUNNER_ when passed through xcodebuild): PHOEBE_SHOTS_DIR, PHOEBE_SHOTS_VARIANT (file name prefix),
+// PHOEBE_E2E_SUBJECT, PHOEBE_E2E_FILE, PHOEBE_E2E_RESTORE_SUBJECT, PHOEBE_E2E_BLOCKED_SUBJECT (tools/e2e_seed.sh).
 @MainActor
 final class E2EFlowTests: XCTestCase {
     private var app: XCUIApplication!
@@ -41,9 +42,13 @@ final class E2EFlowTests: XCTestCase {
         row.tap()
         sleep(2)
         snap("e2e-06-detail-transcript")
+        // Fake STT is chunk-timed like gpt-4o-mini-transcribe, so times are approximate ("~mm:ss", spoken "sekitar …").
+        XCTAssertTrue(element(containing: T("MeetingDetail", "transcript.timing.chunk")).exists, "chunk timing note")
+        XCTAssertTrue(element(containing: "sekitar 0 detik, Selamat pagi").exists, "approximate transcript time")
 
         tapTab(T("MeetingDetail", "detail.tab.notes"))
         snap("e2e-07-detail-notes")
+        XCTAssertTrue(element(containing: "Putar dari sekitar").waitForExistence(timeout: 5), "approximate source reference")
         tapTab(T("MeetingDetail", "detail.tab.mom"))
         snap("e2e-08-mom-empty")
 
@@ -149,6 +154,11 @@ final class E2EFlowTests: XCTestCase {
         tap(T("Library", "library.settings"))
         sleep(3)
         snap("e2e-20-settings")
+        // Automatic notes + Buat MoM consumed 2 of the 30 slots.
+        let allowance = element(containing: "30 generasi AI per 24 jam")
+        XCTAssertTrue(scrollTo(allowance), "AI allowance row")
+        XCTAssertTrue(allowance.label.contains("Sisa 28"), "remaining allowance: \(allowance.label)")
+        snap("e2e-21-settings-allowance")
     }
 
     // Fresh install, existing account: needs PHOEBE_E2E_RESTORE_SUBJECT seeded with "Rapat dari server" (MoM drafted).
@@ -176,6 +186,23 @@ final class E2EFlowTests: XCTestCase {
         sleep(3)
         snap("e2e-restore-03-detail")
         XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS %@", "Selamat pagi")).firstMatch.waitForExistence(timeout: 10), "transcript not loaded")
+
+        // The seed marked s2 uncertain; it is labeled (not color alone), counted, and can be confirmed as correct.
+        let uncertain = element(containing: T("MeetingDetail", "transcript.uncertain"), and: "sekitar 15 detik")
+        XCTAssertTrue(uncertain.waitForExistence(timeout: 5), "uncertain marker")
+        XCTAssertTrue(element(containing: "Perlu ditinjau: 1").exists, "uncertain count")
+        snap("e2e-restore-03b-uncertain")
+        uncertain.press(forDuration: 1.2)
+        tap(T("MeetingDetail", "transcript.edit"))
+        let confirmText = app.buttons[T("MeetingDetail", "transcript.review.confirm")].firstMatch
+        XCTAssertTrue(confirmText.waitForExistence(timeout: 5), "confirm as correct")
+        snap("e2e-restore-03c-review-sheet")
+        confirmText.tap()
+        let resolved = NSPredicate(format: "exists == false")
+        expectation(for: resolved, evaluatedWith: element(containing: "Perlu ditinjau: 1"))
+        waitForExpectations(timeout: 20)
+        XCTAssertFalse(element(containing: T("MeetingDetail", "transcript.uncertain"), and: "sekitar 15 detik").exists, "still uncertain after confirming")
+        snap("e2e-restore-03d-resolved")
 
         let play = app.buttons.matching(identifier: "play.fill").firstMatch
         XCTAssertTrue(play.waitForExistence(timeout: 10), "play button")
@@ -227,6 +254,57 @@ final class E2EFlowTests: XCTestCase {
         let signedOut = welcome.waitForExistence(timeout: 30)
         snap("e2e-restore-06-account-deleted")
         XCTAssertTrue(signedOut, "account deletion did not return to onboarding")
+    }
+
+    // Every AI slot of PHOEBE_E2E_BLOCKED_SUBJECT is used (seeded via SQL), so the upload auto-start is blocked server-side.
+    func testAISlotChoice() throws {
+        guard let subject = env["PHOEBE_E2E_BLOCKED_SUBJECT"] else { throw XCTSkip("PHOEBE_E2E_BLOCKED_SUBJECT not set") }
+        signIn(subject)
+
+        tap(T("Library", "library.add"))
+        tap(T("Library", "library.import"))
+        sleep(2)
+        pickFile()
+        let upload = app.buttons[T("Library", "import.confirm.upload")].firstMatch
+        XCTAssertTrue(upload.waitForExistence(timeout: 15), "import confirm sheet")
+        XCTAssertTrue(element(containing: "Slot AI sedang habis").waitForExistence(timeout: 10), "AI slot note before upload")
+        snap("e2e-ai-01-import-confirm")
+        upload.tap()
+
+        let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", fileName)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 20), "library row")
+        sleep(5)
+        row.tap()
+        let wait = app.buttons[T("MeetingDetail", "ai.choice.wait")].firstMatch
+        let only = app.buttons[T("MeetingDetail", "ai.choice.transcribeOnly")].firstMatch
+        let choose = app.buttons[T("MeetingDetail", "ai.slot.banner.choose")].firstMatch
+        // The sheet opens by itself when the block arrives while the detail is open; otherwise the banner offers it.
+        if !wait.waitForExistence(timeout: 10) {
+            XCTAssertTrue(choose.waitForExistence(timeout: 20), "waiting-for-AI-slot banner")
+            choose.tap()
+        }
+        XCTAssertTrue(wait.waitForExistence(timeout: 5), "wait option")
+        XCTAssertTrue(only.exists, "transcribe-only option")
+        XCTAssertTrue(element(containing: "Sisa 0").waitForExistence(timeout: 10), "allowance summary")
+        XCTAssertTrue(element(containing: "Slot berikutnya tersedia").exists, "next slot time")
+        sleep(1)
+        snap("e2e-ai-02-choice-sheet")
+
+        wait.tap()
+        XCTAssertTrue(choose.waitForExistence(timeout: 10), "banner after choosing wait")
+        XCTAssertFalse(element(containing: "Selamat pagi").exists, "transcribed although the user chose to wait")
+        sleep(1)
+        snap("e2e-ai-03-waiting")
+
+        choose.tap()
+        XCTAssertTrue(only.waitForExistence(timeout: 5), "choice sheet again")
+        only.tap()
+        XCTAssertTrue(element(containing: "Selamat pagi").waitForExistence(timeout: 60), "transcript after transcribe-only")
+        sleep(2)
+        snap("e2e-ai-04-transcript-only")
+        tapTab(T("MeetingDetail", "detail.tab.notes"))
+        XCTAssertTrue(app.buttons[T("MeetingDetail", "notes.generate")].firstMatch.waitForExistence(timeout: 10), "notes not generated yet")
+        snap("e2e-ai-05-notes-not-generated")
     }
 
     func testSignOut() throws {
@@ -336,6 +414,11 @@ final class E2EFlowTests: XCTestCase {
         sleep(1)
     }
 
+    private func element(containing text: String, and other: String? = nil) -> XCUIElement {
+        let predicate = other.map { NSPredicate(format: "label CONTAINS %@ AND label CONTAINS %@", text, $0) } ?? NSPredicate(format: "label CONTAINS %@", text)
+        return app.descendants(matching: .any).matching(predicate).firstMatch
+    }
+
     private func tapTab(_ label: String) {
         let segment = app.buttons[label].firstMatch
         if segment.waitForExistence(timeout: 5) { segment.tap() }
@@ -353,6 +436,7 @@ final class E2EFlowTests: XCTestCase {
     private func snap(_ name: String) {
         let shot = XCUIScreen.main.screenshot()
         let attachment = XCTAttachment(screenshot: shot)
+        let name = env["PHOEBE_SHOTS_VARIANT"].map { "\($0)-\(name)" } ?? name
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
