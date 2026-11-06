@@ -4,7 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Status
 
-Pre-code. Only spec exists: `docs/Phoebe_PRD.md` (Indonesian, MVP v0.1, Kolaris Labs, owner Ari Rudiana). No build/lint/test commands yet — add them here once the iOS and Go projects are scaffolded. Not a git repo yet.
+MVP implemented. Spec: `docs/Phoebe_PRD.md` (Indonesian, MVP v0.1, Kolaris Labs, owner Ari Rudiana); contracts `docs/api.md` (wins on conflicts), `docs/backend.md`, `docs/schema.sql`, `docs/ios.md`; UI `design-system/phoebe/`. What is verified end-to-end vs. pending a device: `docs/STATUS.md`.
+
+Build/test commands:
+- Backend (Go, Postgres via root `docker-compose.yml` on host port 55432): `backend/README.md` — `go vet ./...`, `go test ./... -count=1`, `backend/scripts/smoke.sh`, local run with fake providers + dev login.
+- iOS (XcodeGen + SwiftUI): `ios/README.md` — `xcodegen generate`, unit tests (scheme `Phoebe`), screenshots and E2E UI tests against the local backend (scheme `PhoebeScreenshots`).
 
 Phoebe = iOS app to record meetings → timestamped transcript → AI notes → editable MoM → export (PDF, DOCX, MD, WhatsApp text) via native share sheet. SaaS, quota by audio minutes.
 

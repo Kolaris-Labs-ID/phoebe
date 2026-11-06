@@ -1,0 +1,119 @@
+Optional(Attributes: Application, 0x106825ac0, pid: 80674, label: 'Phoebe'
+Element subtree:
+ →Application, 0x106825ac0, pid: 80674, label: 'Phoebe'
+    Window (Main), 0x1068241a0, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x106824560, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x106824680, {{0.0, 0.0}, {393.0, 852.0}}
+          Other, 0x106824c20, {{0.0, 0.0}, {393.0, 852.0}}
+            Other, 0x1068242c0, {{0.0, 0.0}, {393.0, 852.0}}
+              Other, 0x1068243e0, {{0.0, 0.0}, {393.0, 852.0}}
+                NavigationBar, 0x1068247a0, {{0.0, 53.7}, {393.0, 52.0}}, identifier: 'Meeting'
+                  SearchField, 0x1068248c0, {{16.0, 61.7}, {284.0, 36.0}}, label: 'Cari judul, tag, atau isi', placeholderValue: 'Cari judul, tag, atau isi', value: anggaran-tidak-ada, Keyboard Focused
+                    Image, 0x1068249e0, {{22.0, 70.0}, {20.3, 18.7}}, identifier: 'magnifyingglass', label: 'Cari'
+                    Button, 0x106824b00, {{274.7, 70.3}, {19.7, 19.0}}, label: 'Bersihkan teks'
+                  Button, 0x106822da0, {{311.0, 63.7}, {66.0, 30.0}}, label: 'Batalkan'
+                    StaticText, 0x106822ec0, {{311.0, 68.3}, {66.0, 21.0}}, label: 'Batalkan'
+                Other, 0x106822fe0, {{0.0, 0.0}, {393.0, 852.0}}
+                  Other, 0x106823100, {{0.0, 0.0}, {393.0, 852.0}}
+                    Other, 0x106823220, {{0.0, 0.0}, {393.0, 852.0}}
+                      Other, 0x106823340, {{0.0, 0.0}, {393.0, 852.0}}
+                        CollectionView, 0x106823460, {{0.0, 0.0}, {393.0, 852.0}}
+                          Other, 0x106823580, {{-20.0, -1598.3}, {433.0, 3681.3}}
+                          Cell, 0x1068236a0, {{20.0, 105.7}, {353.0, 253.3}}
+                            Other, 0x106826be0, {{20.0, 105.7}, {353.0, 253.3}}
+                              Other, 0x106826d00, {{20.0, 105.7}, {353.0, 253.3}}
+                                Other, 0x106826e20, {{20.0, 105.7}, {353.0, 253.3}}
+                            Other, 0x106826f40, {{20.0, 105.7}, {353.0, 253.3}}
+                              Other, 0x106827060, {{20.0, 105.7}, {353.0, 253.3}}
+                                Other, 0x106827180, {{20.0, 105.7}, {353.0, 253.3}}
+                                  Image, 0x1068272a0, {{173.3, 136.0}, {46.0, 46.3}}, identifier: 'magnifyingglass', label: 'Cari'
+                                  StaticText, 0x1068273c0, {{120.5, 136.0}, {152.0, 91.0}}, label: 'Tidak ada hasil'
+                                  StaticText, 0x1068274e0, {{90.0, 230.0}, {213.0, 38.0}}, label: 'Tidak ada meeting yang cocok dengan "anggaran-tidak-ada".'
+                                  Button, 0x106827600, {{147.0, 288.0}, {99.3, 44.0}}, label: 'Hapus filter'
+                          Other, 0x106827720, {{360.0, 111.0}, {30.0, 317.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x106827840, {{387.0, 163.0}, {3.0, 262.0}}
+                          Other, 0x106827960, {{360.0, 111.0}, {30.0, 317.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x106827a80, {{387.0, 163.0}, {3.0, 262.0}}
+                        Button, 0x106827ba0, {{16.0, 444.0}, {361.0, 64.0}}, label: 'Rekam'
+                          Image, 0x106827cc0, {{157.0, 467.7}, {17.3, 17.3}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                          StaticText, 0x106827de0, {{16.0, 444.0}, {361.0, 64.0}}, label: 'Rekam'
+                    Other, 0x1047133b0, {{0.0, 0.0}, {393.0, 852.0}}
+                      Other, 0x1047141d0, {{0.0, 0.0}, {393.0, 852.0}}
+    Window, 0x106827f00, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x106828020, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x106828140, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x106828260, {{0.0, 516.0}, {393.0, 336.0}}
+          Other, 0x106a12f50, {{0.0, 516.0}, {393.0, 278.0}}
+    Window, 0x106a18380, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x106a12450, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x106a132b0, {{0.0, 516.0}, {393.0, 336.0}}
+          Other, 0x106a13d20, {{0.0, 516.0}, {393.0, 45.0}}
+            Other, 0x10402d520, {{0.0, 516.0}, {393.0, 45.0}}
+              Other, 0x10401f320, {{0.0, 516.0}, {393.0, 45.0}}
+          Other, 0x10401f440, {{0.0, 516.0}, {393.0, 45.0}}, identifier: 'SystemInputAssistantView'
+            Other, 0x10401f560, {{0.0, 516.0}, {393.0, 45.0}}
+              Other, 0x10401f680, {{0.0, 516.0}, {393.0, 45.0}}, identifier: 'CenterPageView'
+                Other, 0x10401f7a0, {{0.0, -84.0}, {393.0, 1245.0}}
+                  ScrollView, 0x104020560, {{0.0, 516.0}, {393.0, 45.0}}
+                Other, 0x104020680, {{0.0, 516.0}, {393.0, 45.0}}
+                  Other, 0x1040207a0, {{0.0, 516.0}, {393.0, 45.0}}, label: 'Prediksi Pengetikan'
+                    Other, 0x1040208c0, {{0.0, 516.0}, {393.0, 45.0}}
+                      Other, 0x1040209e0, {{0.0, 516.0}, {393.0, 45.0}}
+                        Other, 0x104020c00, {{0.0, 516.0}, {131.0, 45.0}}
+                        Other, 0x104020d20, {{131.0, 516.0}, {131.0, 45.0}}
+                        Other, 0x104020e40, {{262.0, 516.0}, {131.0, 45.0}}
+          Other, 0x104020f60, {{0.0, 561.0}, {393.0, 233.0}}
+            Other, 0x104021080, {{0.0, 561.0}, {393.0, 291.0}}
+              Other, 0x10402cea0, {{0.0, 561.0}, {393.0, 291.0}}
+                Other, 0x10402cfc0, {{0.0, 561.0}, {393.0, 291.0}}
+          Other, 0x10402d0e0, {{0.0, 561.0}, {393.0, 233.0}}
+            Keyboard, 0x10402be60, {{0.0, 561.0}, {393.0, 233.0}}
+              Other, 0x10402bf80, {{0.0, 561.0}, {393.0, 233.0}}
+                Other, 0x10402c0a0, {{0.0, 561.0}, {393.0, 233.0}}, identifier: 'UIKeyboardLayoutStar Preview'
+                  Key, 0x10402c1c0, {{0.0, 568.0}, {39.3, 46.0}}, label: 'Q'
+                  Key, 0x10451c080, {{39.3, 568.0}, {39.3, 46.0}}, label: 'W'
+                  Key, 0x10451c6c0, {{78.7, 568.0}, {39.3, 46.0}}, label: 'E'
+                  Key, 0x10451c7e0, {{118.0, 568.0}, {39.3, 46.0}}, label: 'R'
+                  Key, 0x10451c900, {{157.3, 568.0}, {39.3, 46.0}}, label: 'T'
+                  Key, 0x10451ca20, {{196.7, 568.0}, {39.0, 46.0}}, label: 'Y'
+                  Key, 0x10451cb40, {{235.7, 568.0}, {39.3, 46.0}}, label: 'U'
+                  Key, 0x10451cc60, {{275.0, 568.0}, {39.3, 46.0}}, label: 'I'
+                  Key, 0x10451cd80, {{314.3, 568.0}, {39.3, 46.0}}, label: 'O'
+                  Key, 0x10451d760, {{353.7, 568.0}, {39.3, 46.0}}, label: 'P'
+                  Key, 0x10451d880, {{19.3, 622.0}, {39.3, 46.0}}, label: 'A'
+                  Key, 0x10451d9a0, {{58.7, 622.0}, {39.3, 46.0}}, label: 'S'
+                  Key, 0x10451dac0, {{98.0, 622.0}, {39.3, 46.0}}, label: 'D'
+                  Key, 0x10451dbe0, {{137.3, 622.0}, {39.3, 46.0}}, label: 'F'
+                  Key, 0x10451dd00, {{177.2, 622.0}, {39.3, 46.0}}, label: 'G'
+                  Key, 0x10451de20, {{216.5, 622.0}, {39.3, 46.0}}, label: 'H'
+                  Key, 0x10451df40, {{255.9, 622.0}, {39.3, 46.0}}, label: 'J'
+                  Key, 0x10451e060, {{295.2, 622.0}, {39.3, 46.0}}, label: 'K'
+                  Key, 0x10451e180, {{334.5, 622.0}, {39.3, 46.0}}, label: 'L'
+                  Button, 0x10451e2a0, {{0.0, 676.0}, {50.3, 46.0}}, identifier: 'shift', label: 'shift', Selected
+                  Key, 0x10451e3c0, {{58.7, 676.0}, {39.3, 46.0}}, label: 'Z'
+                  Key, 0x10451e4e0, {{98.0, 676.0}, {39.3, 46.0}}, label: 'X'
+                  Key, 0x106828380, {{137.3, 676.0}, {39.3, 46.0}}, label: 'C'
+                  Key, 0x104715d90, {{177.2, 676.0}, {39.3, 46.0}}, label: 'V'
+                  Key, 0x1047175d0, {{216.5, 676.0}, {39.3, 46.0}}, label: 'B'
+                  Key, 0x104713010, {{255.9, 676.0}, {39.3, 46.0}}, label: 'N'
+                  Key, 0x104713740, {{295.2, 676.0}, {39.3, 46.0}}, label: 'M'
+                  Key, 0x104716100, {{342.7, 676.0}, {50.3, 46.0}}, identifier: 'delete', label: 'delete'
+                  Key, 0x1047148b0, {{0.0, 730.0}, {48.7, 46.0}}, identifier: 'more', label: 'numbers'
+                  Button, 0x1043183e0, {{48.7, 730.0}, {49.3, 46.0}}, label: 'Emoji'
+                  Key, 0x1068284a0, {{97.3, 730.0}, {197.7, 46.0}}, label: ' '
+                  Button, 0x10691e750, {{295.0, 730.0}, {98.0, 46.0}}, identifier: 'Search', label: 'search'
+          Other, 0x112f0fdd0, {{0.0, 561.0}, {393.0, 291.0}}
+            Button, 0x112810b40, {{8.5, 783.7}, {68.1, 68.7}}, label: 'Papan ketik berikutnya', value: Bahasa Indonesia &...
+              StaticText, 0x112808b60, {{8.5, 783.7}, {0.0, 0.0}}
+            Button, 0x10431f780, {{316.4, 783.4}, {68.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
+              StaticText, 0x10402c2e0, {{316.4, 783.4}, {0.0, 0.0}}
+            Button, 0x112d05110, {{316.4, 783.4}, {68.1, 68.7}}, identifier: 'dictation', label: 'Dikte'
+              StaticText, 0x112d07e90, {{316.4, 783.4}, {0.0, 0.0}}
+Path to element:
+ →Application, 0x106825ac0, pid: 80674, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x10402d400, pid: 80674, label: 'Phoebe'
+  }
+)

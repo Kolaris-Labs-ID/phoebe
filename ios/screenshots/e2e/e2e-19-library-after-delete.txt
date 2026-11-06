@@ -1,0 +1,71 @@
+Optional(Attributes: Application, 0x10401fbc0, pid: 72849, label: 'Phoebe'
+Element subtree:
+ →Application, 0x10401fbc0, pid: 72849, label: 'Phoebe'
+    Window (Main), 0x10402b320, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x10402b6e0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x10402b800, {{0.0, 0.0}, {393.0, 852.0}}
+          Other, 0x10402b440, {{0.0, 0.0}, {393.0, 852.0}}
+            Other, 0x10402b560, {{0.0, 0.0}, {393.0, 852.0}}
+              Other, 0x10402b920, {{0.0, 0.0}, {393.0, 852.0}}
+                NavigationBar, 0x10402ba40, {{0.0, 53.7}, {393.0, 148.0}}, identifier: 'Meeting'
+                  Other, 0x10402bb60, {{16.0, 53.7}, {44.0, 44.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                    Other, 0x10402bc80, {{16.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x10402d660, {{16.0, 53.7}, {44.0, 44.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                  Other, 0x10402d780, {{281.0, 53.7}, {44.0, 44.0}}, label: 'Filter'
+                    Other, 0x106830270, {{281.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x106926050, {{281.0, 53.7}, {44.0, 44.0}}, label: 'Filter'
+                        Button, 0x106922460, {{282.0, 53.7}, {42.0, 44.0}}
+                          Other, 0x1069194c0, {{282.0, 53.7}, {42.0, 44.0}}
+                            Image, 0x10422c520, {{282.0, 53.7}, {42.0, 44.0}}, identifier: 'line.3.horizontal.decrease.circle', label: 'Filter'
+                  Other, 0x1069175a0, {{333.0, 53.7}, {44.0, 44.0}}, label: 'Tambah'
+                    Other, 0x10691dd30, {{333.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x10691a990, {{333.0, 53.7}, {44.0, 44.0}}, label: 'Tambah'
+                        Button, 0x106921050, {{339.3, 53.7}, {31.3, 44.0}}
+                          Other, 0x106922ee0, {{339.3, 53.7}, {31.3, 44.0}}
+                            Image, 0x10691f4f0, {{339.3, 53.7}, {31.3, 44.0}}, identifier: 'plus', label: 'Tambah'
+                  StaticText, 0x112821360, {{16.0, 101.3}, {130.0, 40.7}}, label: 'Meeting'
+                  SearchField, 0x106a310d0, {{16.0, 150.7}, {361.0, 36.0}}, label: 'Cari judul, tag, atau isi', placeholderValue: 'Cari judul, tag, atau isi'
+                    Image, 0x106a24390, {{22.0, 159.0}, {20.3, 18.7}}, identifier: 'magnifyingglass', label: 'Cari'
+                Other, 0x106a31f30, {{0.0, 0.0}, {393.0, 852.0}}
+                  Other, 0x106a32050, {{0.0, 0.0}, {393.0, 852.0}}
+                    Other, 0x106a32170, {{0.0, 0.0}, {393.0, 852.0}}
+                      Other, 0x106a32290, {{0.0, 0.0}, {393.0, 852.0}}
+                        CollectionView, 0x106a323b0, {{0.0, 0.0}, {393.0, 852.0}}
+                          Other, 0x106a324d0, {{-20.0, -1502.3}, {433.0, 3798.0}}
+                          Cell, 0x106a325f0, {{20.0, 201.7}, {353.0, 370.0}}
+                            Other, 0x106a32710, {{20.0, 201.7}, {353.0, 370.0}}
+                              Other, 0x106a32830, {{20.0, 201.7}, {353.0, 370.0}}
+                                Other, 0x106a32950, {{20.0, 201.7}, {353.0, 370.0}}
+                            Other, 0x106a32a70, {{20.0, 201.7}, {353.0, 370.0}}
+                              Other, 0x106a32b90, {{20.0, 201.7}, {353.0, 370.0}}
+                                Other, 0x106a32cb0, {{20.0, 201.7}, {353.0, 370.0}}
+                                  Image, 0x106a32dd0, {{174.7, 232.0}, {58.3, 52.0}}, identifier: 'waveform.badge.plus', label: 'waveform.badge.plus'
+                                  StaticText, 0x106a32ef0, {{98.2, 232.0}, {196.7, 96.7}}, label: 'Belum ada meeting'
+                                  StaticText, 0x10422e070, {{72.8, 331.7}, {247.3, 58.0}}, label: 'Rekam meeting atau impor file audio untuk membuat transkrip dan MoM.'
+                                  Button, 0x10422e190, {{129.3, 409.7}, {134.3, 60.0}}, label: 'Rekam'
+                                    Image, 0x10422e2b0, {{150.3, 428.7}, {22.3, 22.3}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                                    StaticText, 0x10422e3d0, {{129.3, 409.7}, {134.3, 60.0}}, label: 'Rekam'
+                                  Button, 0x10422e4f0, {{129.3, 492.7}, {134.3, 44.0}}, label: 'Impor audio'
+                                    Image, 0x10422e610, {{135.0, 504.0}, {16.7, 21.7}}, identifier: 'square.and.arrow.down', label: 'Unduh'
+                                    StaticText, 0x10422e730, {{129.3, 502.3}, {134.3, 25.0}}, label: 'Impor audio'
+                          Other, 0x10422e850, {{360.0, 155.0}, {30.0, 575.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10422e970, {{387.0, 529.0}, {3.0, 198.0}}
+                          Other, 0x10422ea90, {{360.0, 155.0}, {30.0, 575.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10422ebb0, {{387.0, 529.0}, {3.0, 198.0}}
+                        Button, 0x10422ecd0, {{16.0, 746.0}, {361.0, 64.0}}, label: 'Rekam'
+                          Image, 0x10422edf0, {{157.0, 769.7}, {17.3, 17.3}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                          StaticText, 0x10422ef10, {{16.0, 746.0}, {361.0, 64.0}}, label: 'Rekam'
+    Window, 0x10452bde0, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x10452cf00, {{0.0, 0.0}, {393.0, 852.0}}
+    Window, 0x10452b7a0, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x1045300f0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x104530210, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x104530330, {{0.0, 852.0}, {393.0, 233.0}}
+Path to element:
+ →Application, 0x10401fbc0, pid: 72849, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x112a111c0, pid: 72849, label: 'Phoebe'
+  }
+)

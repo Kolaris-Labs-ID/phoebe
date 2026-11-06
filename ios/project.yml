@@ -1,0 +1,69 @@
+name: Phoebe
+options:
+  bundleIdPrefix: com.kolarislabs
+  deploymentTarget: { iOS: "17.0" }
+  developmentLanguage: en
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    LOCALIZATION_PREFERS_STRING_CATALOGS: YES
+    SWIFT_EMIT_LOC_STRINGS: NO
+targets:
+  Phoebe:
+    type: application
+    platform: iOS
+    sources: [Phoebe]
+    entitlements:
+      path: Phoebe/Phoebe.entitlements
+      properties:
+        com.apple.developer.applesignin: [Default]
+    info:
+      path: Phoebe/Info.plist
+      properties:
+        CFBundleDisplayName: Phoebe
+        CFBundleDevelopmentRegion: en
+        CFBundleLocalizations: [en, id]
+        NSMicrophoneUsageDescription: "Phoebe uses the microphone only while you record a meeting."
+        UIBackgroundModes: [audio]
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        NSAppTransportSecurity: { NSAllowsLocalNetworking: true }
+        PhoebeAPIBaseURL: $(PHOEBE_API_BASE_URL)
+        PhoebeDevLogin: $(PHOEBE_DEV_LOGIN)
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.kolarislabs.phoebe
+        TARGETED_DEVICE_FAMILY: "1"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+      configs:
+        Debug:   { PHOEBE_API_BASE_URL: "http://localhost:8080", PHOEBE_DEV_LOGIN: "1" }
+        Release: { PHOEBE_API_BASE_URL: "", PHOEBE_DEV_LOGIN: "0" }
+  PhoebeTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [PhoebeTests]
+    dependencies: [{ target: Phoebe }]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.kolarislabs.phoebe.tests
+  PhoebeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [PhoebeUITests]
+    dependencies: [{ target: Phoebe }]
+    settings:
+      base:
+        GENERATE_INFOPLIST_FILE: YES
+        PRODUCT_BUNDLE_IDENTIFIER: com.kolarislabs.phoebe.uitests
+        TEST_TARGET_NAME: Phoebe
+schemes:
+  Phoebe:
+    build: { targets: { Phoebe: all, PhoebeTests: [test] } }
+    test:  { targets: [PhoebeTests], gatherCoverageData: true }
+  PhoebeScreenshots:
+    build: { targets: { Phoebe: all, PhoebeUITests: [test] } }
+    test:  { targets: [PhoebeUITests] }

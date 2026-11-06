@@ -1,0 +1,76 @@
+Optional(Attributes: Application, 0x112f15e40, pid: 72849, label: 'Phoebe'
+Element subtree:
+ →Application, 0x112f15e40, pid: 72849, label: 'Phoebe'
+    Window (Main), 0x112f15f60, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x104313b30, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x104313c50, {{0.0, 0.0}, {393.0, 852.0}}
+          Other, 0x104313d70, {{0.0, 0.0}, {393.0, 852.0}}
+            Other, 0x104313890, {{0.0, 0.0}, {393.0, 852.0}}
+              Other, 0x1043139b0, {{0.0, 0.0}, {393.0, 852.0}}
+                NavigationBar, 0x104314250, {{0.0, 53.7}, {393.0, 148.0}}, identifier: 'Meeting'
+                  Other, 0x104314370, {{16.0, 53.7}, {44.0, 44.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                    Other, 0x104314490, {{16.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x1043145b0, {{16.0, 53.7}, {44.0, 44.0}}, identifier: 'gearshape', label: 'Pengaturan'
+                  Other, 0x1043146d0, {{281.0, 53.7}, {44.0, 44.0}}, label: 'Filter'
+                    Other, 0x1043147f0, {{281.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x104314910, {{281.0, 53.7}, {44.0, 44.0}}, label: 'Filter'
+                        Button, 0x104314a30, {{282.0, 53.7}, {42.0, 44.0}}
+                          Other, 0x104314b50, {{282.0, 53.7}, {42.0, 44.0}}
+                            Image, 0x104314c70, {{282.0, 53.7}, {42.0, 44.0}}, identifier: 'line.3.horizontal.decrease.circle', label: 'Filter'
+                  Other, 0x104314d90, {{333.0, 53.7}, {44.0, 44.0}}, label: 'Tambah'
+                    Other, 0x104314eb0, {{333.0, 53.7}, {44.0, 44.0}}
+                      Button, 0x106a19710, {{333.0, 53.7}, {44.0, 44.0}}, label: 'Tambah'
+                        Button, 0x106917c90, {{339.3, 53.7}, {31.3, 44.0}}
+                          Other, 0x10691d2e0, {{339.3, 53.7}, {31.3, 44.0}}
+                            Image, 0x10691cc00, {{339.3, 53.7}, {31.3, 44.0}}, identifier: 'plus', label: 'Tambah'
+                  StaticText, 0x10691c880, {{16.0, 101.3}, {130.0, 40.7}}, label: 'Meeting'
+                  SearchField, 0x112e087a0, {{16.0, 150.7}, {361.0, 36.0}}, label: 'Cari judul, tag, atau isi', placeholderValue: 'Cari judul, tag, atau isi'
+                    Image, 0x112e06f60, {{22.0, 159.0}, {20.3, 18.7}}, identifier: 'magnifyingglass', label: 'Cari'
+                Other, 0x112e05a30, {{0.0, 0.0}, {393.0, 852.0}}
+                  Other, 0x112e06840, {{0.0, 0.0}, {393.0, 852.0}}
+                    Other, 0x112e080c0, {{0.0, 0.0}, {393.0, 852.0}}
+                      Other, 0x112e07d50, {{0.0, 0.0}, {393.0, 852.0}}
+                        CollectionView, 0x112e072f0, {{0.0, 0.0}, {393.0, 852.0}}
+                          Other, 0x112e09120, {{-20.0, -1502.3}, {433.0, 3565.3}}
+                          Cell, 0x112e09db0, {{20.0, 201.7}, {353.0, 38.7}}
+                            Other, 0x112e0c6e0, {{20.0, 201.7}, {353.0, 38.7}}
+                            Other, 0x112e0c800, {{20.0, 201.7}, {353.0, 38.7}}
+                              Other, 0x112e0c920, {{20.0, 201.7}, {353.0, 38.7}}
+                                Other, 0x112e0ca40, {{20.0, 201.7}, {353.0, 38.7}}
+                                  StaticText, 0x10450d1d0, {{20.0, 201.7}, {353.0, 38.7}}, label: 'HARI INI'
+                          Cell, 0x10450d4e0, {{20.0, 240.3}, {353.0, 98.7}}
+                            Other, 0x10450aba0, {{20.0, 240.3}, {353.0, 98.7}}
+                              Other, 0x1045151e0, {{20.0, 240.3}, {353.0, 98.7}}
+                            Other, 0x104515550, {{20.0, 240.3}, {353.0, 98.7}}
+                              Other, 0x1045192a0, {{20.0, 240.3}, {353.0, 98.7}}
+                                Other, 0x1045193c0, {{20.0, 240.3}, {353.0, 98.7}}
+                                  Button, 0x10451b460, {{20.0, 240.3}, {353.0, 98.7}}, label: 'RapatUjiE2E, 6 Nov 2026, 8.19, durasi 0 menit, Notes siap'
+                                    Image, 0x10451b580, {{40.0, 255.3}, {40.0, 40.0}}, identifier: 'square.and.arrow.down', label: 'Unduh'
+                                    StaticText, 0x10421b8d0, {{92.0, 255.3}, {97.7, 20.3}}, label: 'RapatUjiE2E'
+                                    StaticText, 0x10421b470, {{92.0, 279.7}, {85.3, 18.0}}, label: '8.19 · 00:20'
+                                    StaticText, 0x10421bb30, {{92.0, 301.7}, {94.0, 22.3}}, label: 'Notes siap'
+                                      Image, 0x10421bc50, {{101.3, 308.7}, {9.7, 8.7}}, identifier: 'note.text', label: 'Catatan'
+                                      StaticText, 0x10421bd70, {{116.3, 305.7}, {61.7, 14.3}}, label: 'Notes siap'
+                          Other, 0x10421be90, {{360.0, 155.0}, {30.0, 575.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10421bfb0, {{387.0, 296.3}, {3.0, 430.7}}
+                          Other, 0x10421c0d0, {{360.0, 155.0}, {30.0, 575.0}}, label: 'Bar gulir vertikal, 1 halaman', value: 0%
+                            Other, 0x10421c1f0, {{387.0, 296.3}, {3.0, 430.7}}
+                        Button, 0x10421c310, {{16.0, 746.0}, {361.0, 64.0}}, label: 'Rekam'
+                          Image, 0x10421c430, {{157.0, 769.7}, {17.3, 17.3}}, identifier: 'record.circle', label: 'Perekaman Layar'
+                          StaticText, 0x10421c550, {{16.0, 746.0}, {361.0, 64.0}}, label: 'Rekam'
+    Window, 0x112e0cb60, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x112e0cc80, {{0.0, 0.0}, {393.0, 852.0}}
+    Window, 0x112e0cda0, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x112e0cec0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x112e0cfe0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x112e0d100, {{0.0, 852.0}, {393.0, 233.0}}
+    Window, 0x112e0d220, {{0.0, 0.0}, {131.0, 284.0}}
+      Other, 0x112a0a3a0, {{0.0, 0.0}, {131.0, 284.0}}
+Path to element:
+ →Application, 0x112f15e40, pid: 72849, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x1044127b0, pid: 72849, label: 'Phoebe'
+  }
+)

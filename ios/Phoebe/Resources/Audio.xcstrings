@@ -1,0 +1,108 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "import.error.corrupt": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio file is damaged or can't be read."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File audio rusak atau tidak dapat dibaca."
+          }
+        }
+      }
+    },
+    "import.error.empty": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "The audio file is empty."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File audio kosong."
+          }
+        }
+      }
+    },
+    "import.error.storage": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not enough iPhone storage to copy the file."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Penyimpanan iPhone tidak cukup untuk menyalin file."
+          }
+        }
+      }
+    },
+    "import.error.tooBig": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File size %1$@ exceeds the %2$lld MB limit."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ukuran file %1$@ melebihi batas %2$lld MB."
+          }
+        }
+      }
+    },
+    "import.error.tooLong": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Audio length %1$@ exceeds the %2$lld-minute limit."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Durasi audio %1$@ melebihi batas %2$lld menit."
+          }
+        }
+      }
+    },
+    "import.error.type": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "This file isn't a valid M4A, MP3, or WAV audio file."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "File ini bukan audio M4A, MP3, atau WAV yang valid."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

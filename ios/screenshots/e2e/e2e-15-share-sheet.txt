@@ -1,0 +1,272 @@
+Optional(Attributes: Application, 0x11281df20, pid: 72849, label: 'Phoebe'
+Element subtree:
+ →Application, 0x11281df20, pid: 72849, label: 'Phoebe'
+    Window (Main), 0x11281e040, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x11281e400, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x11281e520, {{16.0, 59.0}, {361.0, 782.6}}
+          Other, 0x11281e160, {{-345.0, -723.6}, {1083.0, 2347.9}}
+          Other, 0x106835370, {{16.0, 59.0}, {361.0, 782.6}}
+            Other, 0x106835490, {{16.0, 59.0}, {361.0, 782.6}}
+              Other, 0x1068355b0, {{16.0, 59.0}, {361.0, 782.6}}
+                NavigationBar, 0x1068356d0, {{16.0, 108.3}, {361.0, 40.4}}, identifier: 'MoM'
+                  Button, 0x112a10ae0, {{16.0, 108.3}, {84.8, 40.4}}, label: 'Meeting'
+                  StaticText, 0x112d0d900, {{186.5, 119.9}, {20.2, 17.5}}, label: 'MoM'
+                    Other, 0x10460b870, {{186.5, 119.9}, {20.2, 17.5}}
+                      Button, 0x10460ff10, {{187.8, 122.1}, {17.8, 13.2}}, label: 'Tersinkron', Disabled
+                  Other, 0x10460f830, {{239.2, 113.8}, {38.6, 29.4}}, identifier: 'arrow.uturn.backward', label: 'Urungkan'
+                    Other, 0x1046135c0, {{239.2, 113.8}, {38.6, 29.4}}
+                      Button, 0x11281e280, {{239.2, 113.8}, {38.6, 29.4}}, identifier: 'arrow.uturn.backward', label: 'Urungkan'
+                  Other, 0x11281e640, {{285.1, 113.8}, {38.6, 29.4}}, identifier: 'arrow.uturn.forward', label: 'Ulangi'
+                    Other, 0x11281e760, {{285.1, 113.8}, {38.6, 29.4}}
+                      Button, 0x11281e880, {{285.1, 113.8}, {38.6, 29.4}}, identifier: 'arrow.uturn.forward', label: 'Ulangi', Disabled
+                  Other, 0x11281e9a0, {{331.1, 112.9}, {31.2, 31.2}}, label: 'Lainnya'
+                    Other, 0x11281eac0, {{331.1, 112.9}, {31.2, 31.2}}
+                      Button, 0x11281ebe0, {{331.1, 112.9}, {31.2, 31.2}}, label: 'Lainnya'
+                        Button, 0x11281ed00, {{331.1, 112.9}, {31.2, 31.2}}
+                          Other, 0x11281ee20, {{331.1, 112.9}, {31.2, 31.2}}
+                            Image, 0x11281ef40, {{331.1, 112.9}, {31.2, 31.2}}, identifier: 'ellipsis.circle', label: 'Lainnya'
+                Other, 0x11281f060, {{16.0, 59.0}, {361.0, 782.6}}
+                  Other, 0x11281f180, {{16.0, 59.0}, {361.0, 782.6}}
+                    Other, 0x11281f2a0, {{16.0, 59.0}, {361.0, 782.6}}
+                      Other, 0x104408340, {{16.0, 59.0}, {361.0, 782.6}}
+                        ScrollView, 0x104407fa0, {{16.0, 59.0}, {361.0, 782.6}}
+                          Other, 0x104409ef0, {{16.0, 148.7}, {361.0, 1187.7}}
+                            Other, 0x10440a940, {{30.2, 163.4}, {332.5, 1158.3}}
+                              StaticText, 0x104408d80, {{30.7, 163.4}, {105.6, 20.5}}, label: 'Status: Sudah ditinjau', Selected
+                                Image, 0x10440f7e0, {{38.7, 168.6}, {10.1, 10.1}}, identifier: 'checkmark.seal.fill', label: 'Terverifikasi', Selected
+                                StaticText, 0x10440b020, {{53.0, 167.1}, {75.9, 13.2}}, label: 'Sudah ditinjau'
+                              StaticText, 0x10440bdb0, {{143.7, 166.5}, {91.6, 14.4}}, label: 'v2 · Diedit · 8.20'
+                              StaticText, 0x10440dcc0, {{30.7, 206.0}, {165.3, 24.2}}, label: 'Informasi meeting'
+                              StaticText, 0x1044089e0, {{30.7, 253.1}, {34.6, 16.5}}, label: 'Judul'
+                              TextField, 0x10440c860, {{129.9, 251.3}, {225.1, 20.2}}, label: 'Judul', value: RapatUjiE2E diedit
+                                Other, 0x10440ba50, {{129.9, 258.6}, {225.1, 10.1}}, label: 'Bar gulir horizontal, 1 halaman', value: 0%
+                                  Other, 0x10440d5f0, {{132.7, 266.0}, {219.5, 2.8}}
+                              StaticText, 0x104409470, {{30.7, 305.3}, {49.6, 16.5}}, label: 'Tanggal'
+                              Button, 0x10440ea90, {{122.1, 292.2}, {240.7, 41.3}}, label: 'Tanggal', value: Belum ditentukan
+                              StaticText, 0x10440e710, {{30.7, 345.9}, {73.2, 16.5}}, label: 'Zona waktu'
+                              StaticText, 0x10440e3b0, {{122.6, 344.1}, {85.1, 18.7}}, label: 'Zona waktu', value: Asia/Jakarta
+                              StaticText, 0x10440e020, {{30.7, 386.0}, {48.1, 16.5}}, label: 'Peserta'
+                              Button, 0x10440fb50, {{122.6, 373.8}, {130.4, 40.4}}, label: 'Tambah peserta'
+                                Image, 0x10440edf0, {{124.4, 387.8}, {11.9, 11.9}}, identifier: 'plus', label: 'Tambah'
+                                StaticText, 0x1047268c0, {{122.6, 373.8}, {130.4, 40.4}}, label: 'Tambah peserta'
+                              StaticText, 0x1129153b0, {{30.7, 437.5}, {48.1, 16.5}}, label: 'Agenda'
+                              Button, 0x112915040, {{122.6, 425.2}, {129.2, 40.4}}, label: 'Tambah agenda'
+                                Image, 0x104322070, {{124.4, 439.3}, {11.9, 11.9}}, identifier: 'plus', label: 'Tambah'
+                                StaticText, 0x1129145e0, {{122.6, 425.2}, {129.2, 40.4}}, label: 'Tambah agenda'
+                              TextField, 0x112914950, {{30.7, 495.0}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Ringkasan
+                              Button, 0x112914cb0, {{321.9, 487.7}, {40.4, 40.4}}, label: 'Opsi bagian Ringkasan'
+                                Button, 0x1129080e0, {{321.9, 487.7}, {40.4, 40.4}}
+                                  Other, 0x10402cd80, {{321.9, 487.7}, {40.4, 40.4}}
+                                    Image, 0x112a111c0, {{321.9, 487.7}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              TextField, 0x112a157a0, {{38.0, 546.5}, {316.9, 40.4}}, label: 'Dibuat AI', value: Selamat pagi semua...
+                                Other, 0x112a14230, {{38.0, 563.9}, {316.9, 20.2}}, label: 'Bar gulir horizontal, 1 halaman', value: 0%
+                                  Other, 0x112a11de0, {{40.8, 581.4}, {311.4, 2.8}}
+                              Other, 0x112a0ca80, {{30.7, 609.8}, {39.5, 16.5}}, label: 'Dibuat AI'
+                                Image, 0x112a13590, {{39.0, 613.2}, {8.3, 9.8}}, identifier: 'sparkles', label: 'Berkilau'
+                                StaticText, 0x112a14f40, {{51.8, 611.5}, {11.0, 13.2}}, label: 'AI'
+                              Button, 0x112a14b20, {{77.5, 597.9}, {52.7, 40.4}}, label: 'Putar dari 00:00'
+                                Image, 0x112a16e40, {{78.5, 612.3}, {11.3, 11.3}}, identifier: 'clock', label: 'Jam'
+                                StaticText, 0x112a16f60, {{77.5, 597.9}, {52.7, 40.4}}, label: '00:00'
+                              Button, 0x112a17080, {{30.7, 649.3}, {75.9, 40.4}}, label: 'Tambah'
+                                Image, 0x10402d0e0, {{32.5, 663.4}, {11.9, 11.9}}, identifier: 'plus', label: 'Tambah'
+                                StaticText, 0x10402d200, {{30.7, 649.3}, {75.9, 40.4}}, label: 'Tambah'
+                              TextField, 0x112d0f2a0, {{30.7, 719.1}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Pembahasan
+                              Button, 0x112d112c0, {{321.9, 711.8}, {40.4, 40.4}}, label: 'Opsi bagian Pembahasan'
+                                Button, 0x1068357f0, {{321.9, 711.8}, {40.4, 40.4}}
+                                  Other, 0x106835910, {{321.9, 711.8}, {40.4, 40.4}}
+                                    Image, 0x10402d660, {{321.9, 711.8}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              StaticText, 0x10402d780, {{30.7, 774.6}, {87.9, 17.8}}, label: 'Belum ada isi'
+                              Button, 0x10402d8a0, {{306.6, 763.2}, {55.7, 40.4}}, label: 'Tambah'
+                              TextField, 0x106a116a0, {{30.7, 833.1}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Keputusan
+                              Button, 0x106a0fe70, {{321.9, 825.7}, {40.4, 40.4}}, label: 'Opsi bagian Keputusan'
+                                Button, 0x106a14e70, {{321.9, 825.7}, {40.4, 40.4}}
+                                  Other, 0x106a13620, {{321.9, 825.7}, {40.4, 40.4}}
+                                    Image, 0x106a11d70, {{321.9, 825.7}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              StaticText, 0x106a14090, {{30.7, 888.5}, {87.9, 17.8}}, label: 'Belum ada isi'
+                              Button, 0x106a120d0, {{306.6, 877.1}, {55.7, 40.4}}, label: 'Tambah'
+                              TextField, 0x104608e90, {{30.7, 947.0}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Action items
+                              Button, 0x104614d40, {{321.9, 939.6}, {40.4, 40.4}}, label: 'Opsi bagian Action items'
+                                Button, 0x104613c80, {{321.9, 939.6}, {40.4, 40.4}}
+                                  Other, 0x104619c30, {{321.9, 939.6}, {40.4, 40.4}}
+                                    Image, 0x104619810, {{321.9, 939.6}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              StaticText, 0x112d113e0, {{30.7, 1002.4}, {87.9, 17.8}}, label: 'Belum ada isi'
+                              Button, 0x112a171a0, {{306.6, 991.0}, {55.7, 40.4}}, label: 'Tambah'
+                              TextField, 0x112a172c0, {{30.7, 1060.9}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Hal terbuka
+                              Button, 0x112a173e0, {{321.9, 1053.5}, {40.4, 40.4}}, label: 'Opsi bagian Hal terbuka'
+                                Button, 0x112a17500, {{321.9, 1053.5}, {40.4, 40.4}}
+                                  Other, 0x112a17620, {{321.9, 1053.5}, {40.4, 40.4}}
+                                    Image, 0x112a17740, {{321.9, 1053.5}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              StaticText, 0x112a17860, {{30.7, 1116.3}, {87.9, 17.8}}, label: 'Belum ada isi'
+                              Button, 0x10691f4f0, {{306.6, 1105.0}, {55.7, 40.4}}, label: 'Tambah'
+                              TextField, 0x10691a620, {{30.7, 1174.8}, {283.8, 25.7}}, placeholderValue: 'Ganti nama bagian', value: Tindak lanjut
+                              Button, 0x10691a990, {{321.9, 1167.4}, {40.4, 40.4}}, label: 'Opsi bagian Tindak lanjut'
+                                Button, 0x10691b740, {{321.9, 1167.4}, {40.4, 40.4}}
+                                  Other, 0x10691cc00, {{321.9, 1167.4}, {40.4, 40.4}}
+                                    Image, 0x1069194c0, {{321.9, 1167.4}, {40.4, 40.4}}, identifier: 'ellipsis', label: 'Lainnya'
+                              StaticText, 0x10691c180, {{30.7, 1230.2}, {87.9, 17.8}}, label: 'Belum ada isi'
+                              Button, 0x1069175a0, {{306.6, 1218.9}, {55.7, 40.4}}, label: 'Tambah'
+                              Button, 0x10691c880, {{30.7, 1281.3}, {141.8, 40.4}}, label: 'Tambah bagian'
+                                Button, 0x106918dc0, {{30.7, 1281.3}, {141.8, 40.4}}
+                                  Other, 0x10691dd30, {{30.7, 1281.3}, {141.8, 40.4}}
+                                    Image, 0x104323590, {{32.5, 1293.6}, {19.6, 16.2}}, identifier: 'plus.rectangle.on.rectangle', label: 'plus.rectangle.on.rectangle'
+                                    StaticText, 0x112d11500, {{30.7, 1281.3}, {141.8, 40.4}}, label: 'Tambah bagian'
+                          Other, 0x112f22cd0, {{346.7, 148.7}, {27.6, 538.9}}, label: 'Bar gulir vertikal, 3 halaman', value: 0%
+                            Other, 0x112915940, {{371.5, 151.5}, {2.8, 291.5}}
+                          Other, 0x112907650, {{346.7, 148.7}, {27.6, 538.9}}, label: 'Bar gulir vertikal, 3 halaman', value: 0%
+                            Other, 0x112918900, {{371.5, 151.5}, {2.8, 291.5}}
+                        StaticText, 0x10402d9c0, {{30.7, 702.3}, {331.3, 47.5}}, label: 'Ini hanya penanda untuk Anda. Bukan tanda tangan atau persetujuan peserta, dan tidak mengirim dokumen ke siapa pun.'
+                        Image, 0x10402dae0, {{31.9, 771.2}, {18.1, 18.1}}, identifier: 'checkmark.seal.fill', label: 'Terverifikasi', Selected
+                        StaticText, 0x1043236b0, {{31.9, 770.7}, {130.7, 18.7}}, label: 'Sudah ditinjau'
+                        Button, 0x106a14b20, {{179.8, 759.9}, {80.2, 40.4}}, label: 'Kembalikan ke Draft'
+                        Button, 0x104029760, {{267.4, 757.1}, {94.9, 45.9}}, label: 'Ekspor'
+                          Image, 0x106835a30, {{280.2, 770.9}, {13.8, 18.4}}, identifier: 'square.and.arrow.up', label: 'Bagikan'
+                          StaticText, 0x10421e830, {{267.4, 757.1}, {94.9, 45.9}}, label: 'Ekspor'
+      Other, 0x112e19e20, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x112e1a240, {{-393.0, -852.0}, {1179.0, 2556.0}}
+        Other, 0x112e1a660, {{0.0, 69.0}, {393.0, 783.0}}
+          Other, 0x112e1aa80, {{0.0, 69.0}, {393.0, 783.0}}
+            Other, 0x112e1aea0, {{0.0, 69.0}, {393.0, 783.0}}
+              Other, 0x112e1bc00, {{-393.0, -714.0}, {1179.0, 2349.0}}, identifier: 'PopoverDismissRegion', label: 'tutup popup'
+              Other, 0x106835b50, {{0.0, 69.0}, {393.0, 783.0}}
+                Other, 0x106835c70, {{0.0, 69.0}, {393.0, 783.0}}
+                  Other, 0x106835d90, {{0.0, 69.0}, {393.0, 783.0}}
+                    NavigationBar, 0x106835eb0, {{0.0, 69.0}, {393.0, 56.0}}, identifier: 'Ekspor'
+                      Other, 0x106835fd0, {{16.0, 82.7}, {30.7, 29.0}}, identifier: 'xmark', label: 'Tutup'
+                        Other, 0x1068360f0, {{16.0, 82.7}, {30.7, 29.0}}
+                          Button, 0x106836210, {{16.0, 82.7}, {30.7, 29.0}}, identifier: 'xmark', label: 'Tutup'
+                      StaticText, 0x106836330, {{169.0, 86.7}, {55.0, 20.3}}, label: 'Ekspor'
+                    Other, 0x106836450, {{0.0, 69.0}, {393.0, 783.0}}
+                      Other, 0x106836570, {{0.0, 69.0}, {393.0, 783.0}}
+                        Other, 0x106836690, {{0.0, 69.0}, {393.0, 783.0}}
+                          Other, 0x1068367b0, {{0.0, 69.0}, {393.0, 783.0}}
+                            ScrollView, 0x1068368d0, {{0.0, 69.0}, {393.0, 783.0}}
+                              Other, 0x1068369f0, {{0.0, 125.0}, {393.0, 866.3}}
+                                StaticText, 0x106836b10, {{16.0, 141.0}, {68.3, 18.0}}, label: 'Dokumen'
+                                SegmentedControl, 0x106836c30, {{16.0, 167.0}, {361.0, 31.0}}
+                                  Button, 0x106836d50, {{16.0, 167.0}, {119.0, 32.0}}, label: 'MoM', Selected
+                                  Button, 0x106836e70, {{136.0, 167.0}, {120.0, 32.0}}, label: 'Notes AI'
+                                  Button, 0x106836f90, {{257.0, 167.0}, {120.0, 32.0}}, label: 'Catatan Anda'
+                                StaticText, 0x1068370b0, {{16.0, 214.0}, {51.3, 18.0}}, label: 'Format'
+                                Picker, 0x1068371d0, {{16.0, 240.0}, {361.0, 225.0}}, label: 'Format'
+                                  PickerWheel, 0x1068372f0, {{16.0, 240.0}, {361.0, 225.0}}, value: PDF, Untuk dibaca ...
+                                    Other, 0x106837410, {{0.0, 0.0}, {0.0, 0.0}}
+                                    Other, 0x106837530, {{0.0, 0.0}, {0.0, 0.0}}
+                                    Other, 0x104223a10, {{0.0, 0.0}, {0.0, 0.0}}
+                                    Other, 0x1042235f0, {{0.0, 0.0}, {0.0, 0.0}}
+                                StaticText, 0x1042231d0, {{16.0, 481.0}, {361.0, 45.7}}, label: 'Sudah ditinjau oleh Anda.'
+                                  Image, 0x104222db0, {{29.3, 494.0}, {19.7, 19.7}}, identifier: 'checkmark.seal.fill', label: 'Terverifikasi', Selected
+                                  StaticText, 0x104221590, {{58.3, 493.0}, {184.0, 19.3}}, label: 'Sudah ditinjau oleh Anda.'
+                                StaticText, 0x1042216b0, {{16.0, 542.7}, {116.7, 15.7}}, label: 'Dari revisi v2 · 8.20'
+                                StaticText, 0x104223e30, {{16.0, 574.3}, {63.7, 18.0}}, label: 'Pratinjau'
+                                Button, 0x104223f50, {{16.0, 600.3}, {361.0, 375.0}}, label: 'Pratinjau PDF'
+                                  Image, 0x104224070, {{90.3, 612.3}, {212.3, 300.0}}
+                                  StaticText, 0x104224190, {{84.5, 920.3}, {224.0, 15.7}}, label: 'rapatujie2e-diedit-undated-mom.pdf'
+                                  Image, 0x1042242b0, {{108.7, 946.0}, {15.0, 15.0}}, identifier: 'arrow.up.left.and.arrow.down.right', label: 'Masuk Ke Layar Penuh'
+                                  StaticText, 0x1042243d0, {{108.7, 944.0}, {177.8, 19.3}}, label: 'Buka pratinjau penuh'
+                              Other, 0x104029880, {{360.0, 125.0}, {30.0, 547.0}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                                Other, 0x1040299a0, {{387.0, 128.0}, {3.0, 389.7}}
+                              Other, 0x104029ac0, {{360.0, 125.0}, {30.0, 547.0}}, label: 'Bar gulir vertikal, 2 halaman', value: 0%
+                                Other, 0x11281f3c0, {{387.0, 128.0}, {3.0, 389.7}}
+                            Button, 0x1042244f0, {{16.0, 688.0}, {361.0, 64.0}}, label: 'Bagikan'
+                              Image, 0x106837650, {{153.0, 709.7}, {15.3, 20.7}}, identifier: 'square.and.arrow.up', label: 'Bagikan'
+                              StaticText, 0x106837770, {{16.0, 688.0}, {361.0, 64.0}}, label: 'Bagikan'
+                            Button, 0x106837890, {{110.0, 760.0}, {173.0, 50.0}}, label: 'Simpan ke Files'
+                              Image, 0x1068379b0, {{124.0, 777.7}, {19.0, 15.3}}, identifier: 'folder', label: 'Pindahkan'
+                              StaticText, 0x11281f4e0, {{110.0, 760.0}, {173.0, 50.0}}, label: 'Simpan ke Files'
+      Other, 0x1045292a0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x11281f600, {{-393.0, -852.0}, {1179.0, 2556.0}}, identifier: 'PopoverDismissRegion', label: 'tutup popup'
+        Other, 0x11291eee0, {{0.0, 0.0}, {393.0, 852.0}}
+          Other, 0x104224610, {{0.0, 0.0}, {393.0, 852.0}}
+            Other, 0x104224730, {{0.0, 0.0}, {393.0, 852.0}}
+              Other, 0x104224850, {{0.0, 0.0}, {393.0, 852.0}}, identifier: 'ActivityListView'
+                Other, 0x104323dd0, {{0.0, 0.0}, {393.0, 852.0}}
+                  Other, 0x10461a050, {{0.0, 0.0}, {393.0, 852.0}}
+                    Other, 0x1046144e0, {{0.0, 0.0}, {393.0, 852.0}}
+                      Other, 0x10461f7b0, {{0.0, 0.0}, {393.0, 852.0}}
+                        Other, 0x106837ad0, {{0.0, 0.0}, {393.0, 852.0}}
+                          Other, 0x106837bf0, {{0.0, 398.7}, {393.0, 453.3}}
+                            Image, 0x106837d10, {{-150.0, 248.7}, {693.0, 753.3}}
+                            Other, 0x106837e30, {{0.0, 398.7}, {393.0, 453.3}}
+                              Other, 0x106837f50, {{0.0, 398.7}, {393.0, 453.3}}
+                                Other, 0x104029be0, {{0.0, 398.7}, {393.0, 453.3}}
+                                  NavigationBar, 0x104029d00, {{0.0, 398.7}, {393.0, 72.0}}, identifier: 'UIActivityContentView'
+                                    Button, 0x104029e20, {{342.0, 404.7}, {43.0, 44.0}}, label: 'Close'
+                                      Image, 0x104029f40, {{350.0, 412.3}, {30.0, 30.0}}, identifier: 'UICloseButtonBackground'
+                                    Other, 0x10402a060, {{52.0, 416.2}, {266.0, 18.0}}, label: 'rapatujie2e-diedit-undated-mom'
+                                    Other, 0x10402a180, {{52.0, 434.2}, {266.0, 18.0}}, label: 'PDF Document · 18 KB'
+                                  Other, 0x10402a2a0, {{0.0, 398.7}, {393.0, 453.3}}
+                                    Other, 0x10402a3c0, {{0.0, 398.7}, {393.0, 453.3}}
+                                      Other, 0x10402a4e0, {{0.0, 398.7}, {393.0, 453.3}}
+                                        Other, 0x10402a600, {{0.0, 398.7}, {393.0, 453.3}}
+                                          Other, 0x10402a720, {{0.0, 398.7}, {393.0, 453.3}}
+                                        CollectionView, 0x10402a840, {{0.0, 398.7}, {393.0, 453.3}}
+                                          ScrollView, 0x10402a960, {{8.0, 470.7}, {377.0, 132.0}}
+                                            Cell, 0x10402aa80, {{8.0, 470.7}, {78.0, 132.0}}, label: 'More'
+                                              Other, 0x10402aba0, {{8.0, 470.7}, {78.0, 132.0}}
+                                                Other, 0x10402acc0, {{8.0, 561.7}, {78.0, 13.3}}
+                                                  Other, 0x10402ade0, {{8.0, 561.7}, {78.0, 13.3}}
+                                                StaticText, 0x10402af00, {{8.0, 561.7}, {78.0, 13.3}}, label: 'More'
+                                                Image, 0x10402b020, {{15.0, 492.7}, {64.0, 64.0}}
+                                          Cell, 0x10402b140, {{16.0, 602.7}, {361.0, 50.3}}, label: 'Salin'
+                                            Other, 0x10402b260, {{16.0, 602.7}, {361.0, 50.3}}
+                                              Other, 0x10402b380, {{16.0, 602.7}, {361.0, 50.3}}
+                                            Other, 0x10402b4a0, {{16.0, 602.7}, {361.0, 50.3}}
+                                              Other, 0x10402b5c0, {{16.0, 602.7}, {361.0, 50.3}}
+                                                Other, 0x10402b6e0, {{16.0, 602.7}, {361.0, 50.3}}
+                                              Other, 0x10402b800, {{36.0, 617.7}, {282.7, 20.3}}
+                                                StaticText, 0x10402b920, {{36.0, 617.7}, {282.7, 20.3}}, label: 'Salin'
+                                              Other, 0x10402ba40, {{36.0, 617.7}, {282.7, 20.3}}
+                                              Other, 0x10402bb60, {{334.7, 612.0}, {32.0, 32.0}}
+                                                Image, 0x10402bc80, {{334.7, 606.7}, {32.0, 42.7}}, identifier: 'doc.on.doc', label: 'copy'
+                                          Cell, 0x104027760, {{16.0, 663.0}, {361.0, 50.3}}, label: 'Markah'
+                                            Other, 0x104027880, {{16.0, 663.0}, {361.0, 50.3}}
+                                              Other, 0x1040279a0, {{16.0, 663.0}, {361.0, 50.3}}
+                                            Other, 0x104027ac0, {{16.0, 663.0}, {361.0, 50.3}}
+                                              Other, 0x104027be0, {{16.0, 663.0}, {361.0, 50.3}}
+                                                Other, 0x104719c10, {{16.0, 663.0}, {361.0, 50.3}}
+                                              Other, 0x104717260, {{36.0, 678.0}, {282.7, 20.3}}
+                                                StaticText, 0x104718dc0, {{36.0, 678.0}, {282.7, 20.3}}, label: 'Markah'
+                                              Other, 0x1047186e0, {{36.0, 678.0}, {282.7, 20.3}}
+                                              Other, 0x10471ad30, {{334.7, 672.3}, {32.0, 32.0}}
+                                                Image, 0x104719110, {{334.7, 669.7}, {32.0, 37.3}}, identifier: 'pencil.tip.crop.circle', label: 'Markup'
+                                          Other, 0x1045293c0, {{16.0, 713.0}, {361.0, 0.3}}
+                                          Cell, 0x1045294e0, {{16.0, 713.3}, {361.0, 50.3}}, label: 'Cetak'
+                                            Other, 0x106a14430, {{16.0, 713.3}, {361.0, 50.3}}
+                                              Other, 0x106a0b2a0, {{16.0, 713.3}, {361.0, 50.3}}
+                                            Other, 0x106a12b90, {{16.0, 713.3}, {361.0, 50.3}}
+                                              Other, 0x106a0a9f0, {{16.0, 713.3}, {361.0, 50.3}}
+                                                Other, 0x106a1c810, {{16.0, 713.3}, {361.0, 50.3}}
+                                              Other, 0x104027d00, {{36.0, 728.3}, {282.7, 20.3}}
+                                                StaticText, 0x104027e20, {{36.0, 728.3}, {282.7, 20.3}}, label: 'Cetak'
+                                              Other, 0x112e1bd20, {{36.0, 728.3}, {282.7, 20.3}}
+                                              Other, 0x112e1be40, {{334.7, 722.7}, {32.0, 32.0}}
+                                                Image, 0x112e1bf60, {{334.7, 719.7}, {32.0, 38.7}}, identifier: 'printer', label: 'print'
+                                          Other, 0x112e1c080, {{16.0, 763.3}, {361.0, 0.3}}
+                                          Cell, 0x112e1c1a0, {{16.0, 763.7}, {361.0, 50.3}}, label: 'Save to Files'
+                                            Other, 0x112d11820, {{16.0, 763.7}, {361.0, 50.3}}
+                                              Other, 0x112d11940, {{16.0, 763.7}, {361.0, 50.3}}
+                                            Other, 0x112d11a60, {{16.0, 763.7}, {361.0, 50.3}}
+                                              Other, 0x112d11b80, {{16.0, 763.7}, {361.0, 50.3}}
+                                                Other, 0x106838070, {{16.0, 763.7}, {361.0, 50.3}}
+                                              Other, 0x106838190, {{36.0, 778.7}, {282.7, 20.3}}
+                                                StaticText, 0x1068382b0, {{36.0, 778.7}, {282.7, 20.3}}, label: 'Save to Files'
+                                              Other, 0x1068383d0, {{36.0, 778.7}, {282.7, 20.3}}
+                                              Other, 0x1068384f0, {{334.7, 773.0}, {32.0, 32.0}}
+                                                Image, 0x106838610, {{334.7, 773.0}, {32.0, 32.0}}
+                                          Other, 0x104323ef0, {{16.0, 814.0}, {361.0, 59.0}}
+                                            Button, 0x104324010, {{36.0, 824.0}, {321.0, 33.0}}, label: 'Edit Actions…'
+                                              StaticText, 0x112d11ca0, {{36.0, 830.0}, {104.0, 21.0}}, label: 'Edit Actions…'
+    Window, 0x104224970, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x104224a90, {{0.0, 0.0}, {393.0, 852.0}}
+    Window, 0x104227810, {{0.0, 0.0}, {393.0, 852.0}}
+      Other, 0x104227930, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x112f22df0, {{0.0, 0.0}, {393.0, 852.0}}
+        Other, 0x104707fd0, {{0.0, 852.0}, {393.0, 233.0}}
+Path to element:
+ →Application, 0x11281df20, pid: 72849, label: 'Phoebe'
+Query chain:
+ →Find: Target Application 'com.kolarislabs.phoebe'
+  Output: {
+    Application, 0x10691ff70, pid: 72849, label: 'Phoebe'
+  }
+)

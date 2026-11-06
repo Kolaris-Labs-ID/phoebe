@@ -1,0 +1,20 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "CFBundleDisplayName" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Phoebe" } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Phoebe" } }
+      }
+    },
+    "NSMicrophoneUsageDescription" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Phoebe uses the microphone only while you record a meeting." } },
+        "id" : { "stringUnit" : { "state" : "translated", "value" : "Phoebe memakai mikrofon hanya saat Anda merekam meeting." } }
+      }
+    }
+  },
+  "version" : "1.0"
+}

@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "sync.notSynced": {
+      "extractionState": "manual",
+      "localizations": {
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "A change couldn't be synced. It's still saved on this iPhone."
+          }
+        },
+        "id": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ada perubahan yang tidak dapat disinkronkan. Perubahan tetap tersimpan di iPhone ini."
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
